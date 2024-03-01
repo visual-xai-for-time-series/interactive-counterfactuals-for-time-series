@@ -69,8 +69,6 @@ def get_time_series_from_activations(model, activation, time_series_shape, layer
     if border_max is not None and border_min is not None:
         alpha = (border_max - border_min).reshape(-1) / steps
 
-    print(f'alpha: {alpha}')
-
     criterion = nn.MSELoss()
     for _ in range(steps):
         ts_candidate.requires_grad_(True)
@@ -83,13 +81,14 @@ def get_time_series_from_activations(model, activation, time_series_shape, layer
         if best_solution[0] > loss:
             best_solution = [loss, ts_candidate]
         # print(f'loss: {loss}')
+        loss = loss * -1 # fix for gradient ascent
         loss.backward(retain_graph=True)
 
         ts_candidate_grad = ts_candidate.grad.reshape(-1)
         ts_candidate = torch.add(
             ts_candidate.reshape(-1),
             torch.mul(
-                ts_candidate_grad * -1,
+                ts_candidate_grad,
                 alpha),
             )
 

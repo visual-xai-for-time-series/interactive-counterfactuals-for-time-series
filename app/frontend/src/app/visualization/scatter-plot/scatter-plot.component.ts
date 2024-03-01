@@ -79,6 +79,14 @@ export class ScatterPlotComponent implements AfterViewInit {
             }
         })
 
+        this.interactionsService.getColorMode.subscribe((mode) => {
+            if (mode != null) {
+                console.log(mode)
+
+                this.changeColorOfPoints(mode)
+            }
+        })
+
         this.interactionsService.getScatterData.subscribe((data) => {
             if (data != null) {
                 this.projectDataAndAddToScatterPlot(this.projectUrl, data)
@@ -496,9 +504,9 @@ export class ScatterPlotComponent implements AfterViewInit {
 
     private changeColorOfPoints(mode: number = 1): void {
         if (mode === 1) {
-            this.color = this.predictions
-        } else if (mode === 2) {
             this.color = this.labels
+        } else if (mode === 2) {
+            this.color = this.predictions
         }
         if (this.svg) {
             this.svg.selectAll('.data-point').attr('fill', (_, i: number) => d3.schemeDark2[this.color[i]])

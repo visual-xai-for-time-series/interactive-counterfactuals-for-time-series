@@ -1,7 +1,6 @@
 import { Component, OnInit } from '@angular/core'
 
 import { ScatterPlotComponent } from './scatter-plot/scatter-plot.component'
-import { HttpClient } from '@angular/common/http'
 import { CommonModule } from '@angular/common'
 import { MatGridListModule } from '@angular/material/grid-list'
 
@@ -9,6 +8,10 @@ import { MultiLinePlotComponent } from './multi-line-plot/multi-line-plot.compon
 import { SingleLinePlotComponent } from './single-line-plot/single-line-plot.component'
 import { MatTabsModule } from '@angular/material/tabs'
 import { MatProgressBarModule } from '@angular/material/progress-bar'
+
+import { MatIconModule } from '@angular/material/icon'
+import { MatDividerModule } from '@angular/material/divider'
+import { MatButtonModule } from '@angular/material/button'
 
 import { InteractionsService } from './interactions.service'
 import { HttpService } from './http.service'
@@ -26,6 +29,9 @@ import * as d3 from 'd3'
         MatGridListModule,
         MatTabsModule,
         MatProgressBarModule,
+        MatIconModule,
+        MatDividerModule,
+        MatButtonModule,
     ],
     templateUrl: './visualization.component.html',
     styleUrl: './visualization.component.scss',
@@ -77,5 +83,9 @@ export class VisualizationComponent implements OnInit {
         this.httpService.isRequestPending().subscribe((pending: boolean) => {
             this.isRequestPending = pending
         })
+    }
+
+    setColorMode(mode: number = 1) {
+        this.interactionsService.setColorMode(mode)
     }
 }

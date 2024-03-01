@@ -14,9 +14,16 @@ export class InteractionsService {
     private scatterData = new BehaviorSubject(null)
     getScatterData = this.scatterData.asObservable()
 
+    private colorMode = new BehaviorSubject(1)
+    getColorMode = this.colorMode.asObservable()
+
     private data
 
     constructor() {}
+
+    setColorMode(mode: number): void {
+        this.colorMode.next(mode)
+    }
 
     setHighlightData(data: any): void {
         this.highlightData.next(data)

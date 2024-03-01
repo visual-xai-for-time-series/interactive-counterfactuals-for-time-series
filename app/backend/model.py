@@ -100,7 +100,7 @@ def predict_using_model(data, model_name='resnet'):
     return predictions
 
 
-def generate_time_series_from_activation(data, model_name='resnet'):
+def generate_time_series_from_activation(data, model_name='resnet', steps=10):
     model = models_in_memory[model_name]
     model.eval()
 
@@ -146,19 +146,21 @@ def generate_time_series_from_activation(data, model_name='resnet'):
     ts_candidate = np.mean(ts_candidates, axis=0)
     # ts_candidate = np.random.default_rng().uniform(border_min, border_max, border_max.shape)
 
-    alpha = torch.tensor(0.8)
+    border_max = torch.from_numpy(border_max).float().to(device)
+    border_min = torch.from_numpy(border_min).float().to(device)
+
+    alpha = torch.tensor(0.5)
+    if border_max is not None and border_min is not None:
+        alpha = (border_max - border_min).reshape(-1) / steps
 
     criterion = nn.MSELoss()
     data = torch.from_numpy(data).float().to(device)
-
-    border_max = torch.from_numpy(border_max).float().to(device)
-    border_min = torch.from_numpy(border_min).float().to(device)
 
     ts_candidate = torch.from_numpy(ts_candidate).float().to(device)
 
     best_solution = [1000000, None]
 
-    for x in range(1000):
+    for x in range(steps):
         ts_candidate.requires_grad_(True)
         ts_candidate.retain_grad()
 
@@ -169,6 +171,7 @@ def generate_time_series_from_activation(data, model_name='resnet'):
         print(f'loss: {loss}')
         if best_solution[0] > loss:
             best_solution = [loss, ts_candidate]
+        loss = loss * -1 # fix for gradient ascent
         loss.backward(retain_graph=True)
 
         ts_candidate_grad = ts_candidate.grad.reshape(-1)
@@ -185,10 +188,10 @@ def generate_time_series_from_activation(data, model_name='resnet'):
             ts_candidate = torch.clamp(ts_candidate, border_min, border_max)
 
             # Random addition
-            ts_candidate = ts_candidate.reshape(-1) * (0.2 * torch.rand(ts_candidate.reshape(-1).shape[0]) + 0.80)
+            # ts_candidate = ts_candidate.reshape(-1) * (0.2 * torch.rand(ts_candidate.reshape(-1).shape[0]) + 0.80)
 
             # Smooth time series
-            ts_candidate = moving_average_torch(ts_candidate.reshape(-1), 3)
+            # ts_candidate = moving_average_torch(ts_candidate.reshape(-1), 3)
 
     ts_candidate = best_solution[1]
     predictions = torch.argmax(model(ts_candidate.reshape(1, 1, -1)).detach().cpu(), axis=1).numpy().tolist()

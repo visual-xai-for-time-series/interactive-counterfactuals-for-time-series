@@ -489,15 +489,14 @@ def main():
             ts_shape = list(base_data_for_maps['data'][stage].shape)
             ts_shape = [1, 1, ts_shape[-1]]
             ts_data = np.array(base_data_for_maps['data'][stage])
-            for activation in augmented_stage_activations:
+            for activation in tqdm(augmented_stage_activations):
                 activation = torch.from_numpy(activation).float().to(device)
                 _, prediction = get_time_series_from_activations(model, activation, ts_shape, -2, activation_data, ts_data)
-                print(prediction)
                 density_predictions.append(prediction)
             density_predictions = np.array(density_predictions)
 
             density_map['activations'][stage] = [mapped_data, density_predictions]
-
+            print('Done with activations')
 
         # Generate attribution prediction density
         print('Start with density attributions map')

@@ -3,6 +3,7 @@ version: '3'
 name: icfts
 services:
     preprocess:
+        tty: true
         build:
             context: app/
             dockerfile: ./../docker/Dockerfile-preprocess

@@ -16,3 +16,5 @@ torch==1.12.1
 torchvision==0.13.1
 
 dill==0.3.8
+
+tqdm==4.66.1
