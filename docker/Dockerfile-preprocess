@@ -1,0 +1,20 @@
+# Use the official Python 3.10 image as the base image
+FROM python:3.10
+
+# Create a directory named 'app' in the container filesystem
+RUN mkdir /app
+
+# Set the working directory to '/app' within the container
+WORKDIR /app
+
+# Copy the requirements.txt file from the local 'preprocess' directory to the '/app' directory in the container
+COPY preprocess/requirements.txt /app/requirements.txt
+
+# Install Python dependencies listed in 'requirements.txt' inside the container
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all contents from the local 'preprocess' directory to the '/app' directory in the container
+COPY preprocess/ /app/
+
+# Define the default command to execute when the container starts
+CMD bash preprocess.bash

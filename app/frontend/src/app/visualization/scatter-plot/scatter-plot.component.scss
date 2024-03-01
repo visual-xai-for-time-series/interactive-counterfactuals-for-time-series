@@ -1,0 +1,7 @@
+h3 {
+    text-align: center;
+}
+
+:host ::ng-deep .dataPoint {
+    cursor: pointer;
+}

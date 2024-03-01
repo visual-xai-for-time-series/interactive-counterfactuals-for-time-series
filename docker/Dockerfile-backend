@@ -1,0 +1,17 @@
+# Use the official Python 3.10 image as the base image
+FROM python:3.10
+
+# Create a directory named 'app' in the container filesystem
+RUN mkdir /app
+
+# Set the working directory to '/app' within the container
+WORKDIR /app
+
+# Copy all contents from the local 'backend' directory to the '/app' directory in the container
+COPY backend/ /app/
+
+# Install Python dependencies listed in 'requirements.txt' inside the container
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Define the default command to execute when the container starts
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
