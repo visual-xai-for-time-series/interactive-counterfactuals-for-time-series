@@ -212,7 +212,7 @@ def main():
         model.eval()
 
         print(f'Layer to look at the activations: {layer_to_look_at}')
-        activation_handle = layer_to_look_at.register_forward_hook(get_activation(activations, 'train'))
+        activation_handle = layer_to_look_at.register_forward_hook(get_activations(activations, 'train'))
 
         for idx, (inputs, labels) in enumerate(dataloader_train_not_shuffled):
             inputs = inputs.reshape(inputs.shape[0], 1, -1)
@@ -223,7 +223,7 @@ def main():
 
         activation_handle.remove()
 
-        activation_handle = layer_to_look_at.register_forward_hook(get_activation(activations, 'test'))
+        activation_handle = layer_to_look_at.register_forward_hook(get_activations(activations, 'test'))
 
         for idx, (inputs, labels) in enumerate(dataloader_test):
             inputs = inputs.reshape(inputs.shape[0], 1, -1)
@@ -249,6 +249,14 @@ def main():
     sample, label = dataset_train[0]
     shape = sample.reshape(1, -1).shape
 
+    attribution_techniques = [
+        # ['Saliency', Saliency],
+        ['DeepLift', DeepLift],
+        # ['IntegratedGradients', IntegratedGradients],
+        # ['ShapleyValueSampling', ShapleyValueSampling],
+    ]
+    attribution_techniques_dict = {k: v for k, v in attribution_techniques}
+
     attributions_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-attributions.pkl')
     if os.path.exists(attributions_path):
         with open(attributions_path, 'rb') as file:
@@ -257,13 +265,6 @@ def main():
         attribution_techniques = [[x, None] for x in attributions['train'].keys()]
     else:
         model.eval()
-        
-        attribution_techniques = [
-            # ['Saliency', Saliency],
-            ['DeepLift', DeepLift],
-            # ['IntegratedGradients', IntegratedGradients],
-            # ['ShapleyValueSampling', ShapleyValueSampling],
-        ]
 
         attributions = {'train': {}, 'test': {}}
 
@@ -408,11 +409,15 @@ def main():
         }
 
 
-        def create_decision_border_dense_map_for_data(data, mapper):
+        def create_decision_border_dense_map_for_data(data, mapper, projected_data=None):
             # Generate augmented data using mapper
-            projected_data = mapper.transform(data)
+            if projected_data is None:
+                projected_data = mapper.transform(data)
             projected_data_max = np.max(projected_data, axis=0)
             projected_data_min = np.min(projected_data, axis=0)
+            projected_data_pad = (projected_data_max - projected_data_min) * 0.05
+            projected_data_max += projected_data_pad
+            projected_data_min -= projected_data_pad
             # sample_nr = 250
             sample_nr = 100
             dim_x = np.linspace(projected_data_min[0], projected_data_max[0], sample_nr)
@@ -429,61 +434,29 @@ def main():
             predictions = predictions.detach().cpu().numpy()
             return predictions
 
+        # Generate grid data and prediction density for data
+        print('Start with density time series map')
+        augmented_time_series = {}
+        for stage in base_data_for_maps['data']:
+            print('\t', f'Start with {stage}')
+            mapper, projected_data = mappings_to_create['data'][stage]
+            data = base_data_for_maps['data'][stage]
 
-        density_ts_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-ts-density.pkl')
-        if os.path.exists(density_ts_path):
-            with open(density_ts_path, 'rb') as file:
-                density_ts_map = dill.load(file)
-                [[mapped_data, density_predictions], augmented_time_series] = density_ts_map
-        else:
-
-            # Generate grid data and prediction density for data
-            print('Start with density time series map')
-            augmented_time_series = {}
-            for stage in base_data_for_maps['data']:
-                print('\t', f'Start with {stage}')
-                mapper = mappings_to_create['data'][stage][0]
-                data = base_data_for_maps['data'][stage]
-
-                mapped_data, augmented_stage_time_series = create_decision_border_dense_map_for_data(data, mapper)
-                density_predictions = create_predictions(augmented_stage_time_series)
-                augmented_time_series[stage] = [augmented_stage_time_series, density_predictions]
-                density_map['data'][stage] = [mapped_data, density_predictions]
-
-            density_ts_map = [[mapped_data, density_predictions], augmented_time_series]
-
-            with open(density_ts_path, 'wb') as file:
-                dill.dump(density_ts_map, file)
-
+            # Create further time series data
+            mapped_data, augmented_stage_time_series = create_decision_border_dense_map_for_data(data, mapper, projected_data)
+            density_predictions = create_predictions(augmented_stage_time_series)
+            augmented_time_series[stage] = [augmented_stage_time_series, density_predictions]
+            density_map['data'][stage] = [mapped_data, density_predictions]
 
         # Generate activation prediction density
         print('Start with density activations map')
         for stage in base_data_for_maps['activations']:
             print('\t', f'Start with {stage}')
-            mapper = mappings_to_create['activations'][stage][0]
-
-            # Take time series to get more activations
-            augmented_ts_data, predictions = augmented_time_series[stage]
-
-            activations = {}
-            hook = get_activation(activations, 'layer_to_look_at')
-            activation_handle = layer_to_look_at.register_forward_hook(hook)
-            create_predictions(augmented_ts_data)
-            augmented_activations = activations['layer_to_look_at'].detach().numpy()
-            activation_handle.remove()
-
-            print(f'activations: {augmented_activations}')
-
-            mapped_augmented_data = mapper.transform(augmented_activations)
-
-            print(f'activations: {mapped_augmented_data}')
+            mapper, projected_data = mappings_to_create['activations'][stage]
 
             # Create further activation data
             activation_data = base_data_for_maps['activations'][stage]
-            complete_activations = np.concatenate((activation_data, augmented_activations), axis=0)
-            mapped_data, augmented_stage_activations = create_decision_border_dense_map_for_data(complete_activations, mapper)
-
-            print(len(augmented_stage_activations))
+            mapped_data, augmented_stage_activations = create_decision_border_dense_map_for_data(activation_data, mapper, projected_data)
 
             density_predictions = []
             ts_shape = list(base_data_for_maps['data'][stage].shape)
@@ -496,22 +469,34 @@ def main():
             density_predictions = np.array(density_predictions)
 
             density_map['activations'][stage] = [mapped_data, density_predictions]
-            print('Done with activations')
+        print('Done with activations')
 
         # Generate attribution prediction density
         print('Start with density attributions map')
         for stage in base_data_for_maps['attributions']:
             print('\t', f'Start with {stage}')
+            density_map['attributions'][stage] = {}
 
             for attribution in base_data_for_maps['attributions'][stage]:
-                mapper = mappings_to_create['attributions'][stage][attribution][0]
-                data, predictions = augmented_time_series[stage]
+                print('\t\t', f'Start with {attribution}')
+                mapper, projected_data = mappings_to_create['attributions'][stage][attribution]
 
-                create_predictions(data)
+                # Create further attribution data
+                attribution_data = base_data_for_maps['attributions'][stage][attribution]
+                mapped_data, augmented_stage_attribution = create_decision_border_dense_map_for_data(attribution_data, mapper, projected_data)
 
+                density_predictions = []
+                ts_shape = list(base_data_for_maps['data'][stage].shape)
+                ts_shape = [1, 1, ts_shape[-1]]
+                ts_data = np.array(base_data_for_maps['data'][stage])
+                for attr in tqdm(augmented_stage_attribution):
+                    attr = torch.from_numpy(attr).float().to(device)
+                    _, prediction = get_time_series_from_attributions(model, attr, ts_shape, attribution_techniques_dict[attribution], attribution_data, ts_data)
+                    density_predictions.append(prediction)
+                density_predictions = np.array(density_predictions)
 
-                density_map['attributions'][stage] = [mapped_data, predictions]
-
+                density_map['attributions'][stage][attribution] = [mapped_data, density_predictions]
+        print('Done with attributions')
 
         with open(density_path, 'wb') as file:
             dill.dump(density_map, file)

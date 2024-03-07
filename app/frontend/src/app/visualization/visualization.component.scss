@@ -1,6 +1,20 @@
-:host ::ng-deep #bottomOverlay {
+:host ::ng-deep #bottom-progress {
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
+}
+
+:host ::ng-deep #main-visualization {
+    height: 98vh;
+}
+
+:host ::ng-deep button {
+    margin: 0 10px 0 10px;
+}
+
+:host ::ng-deep #main-header {
+    text-align: center;
+    height: 2vh;
+    margin: 10px 0 10px 0;
 }

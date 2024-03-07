@@ -18,11 +18,17 @@ export class ScatterPlotComponent implements AfterViewInit {
 
     @ViewChild('div') div_element: ElementRef<HTMLDivElement> | undefined
 
+    private uniqueIdentifier
+
     private counterCF = 0
+
+    private mainDiv
 
     private svg
     private density
     private scatter
+
+    private canvas
 
     private dataUrl
     private densityUrl
@@ -42,14 +48,21 @@ export class ScatterPlotComponent implements AfterViewInit {
 
     private containerWidth
     private containerHeight
+
     private margin = { top: 10, right: 10, bottom: 10, left: 10 }
 
     private minDrag = { x: 15, y: 15 }
     private minClick = { x: 1, y: 1 }
 
+    private line_stroke_width: number = 2.5
+
     private radius = 4
 
-    public title: string = ''
+    public title
+
+    tooltipPosition = { x: 0, y: 0 }
+    showTooltip = false
+    tooltipContent = ''
 
     constructor(
         private httpService: HttpService,
@@ -69,6 +82,7 @@ export class ScatterPlotComponent implements AfterViewInit {
         this.predictions = data[2]
         this.prediction_probabilities = data[3]
 
+        this.uniqueIdentifier = cyrb53(this.title)
         this.color = this.predictions
 
         this.interactionsService.getHighlightData.subscribe((data) => {
@@ -81,8 +95,6 @@ export class ScatterPlotComponent implements AfterViewInit {
 
         this.interactionsService.getColorMode.subscribe((mode) => {
             if (mode != null) {
-                console.log(mode)
-
                 this.changeColorOfPoints(mode)
             }
         })
@@ -99,22 +111,32 @@ export class ScatterPlotComponent implements AfterViewInit {
     }
 
     private createSVG(): void {
-        this.containerWidth = this.div_element?.nativeElement.clientWidth ?? 600 - 10
-        this.containerHeight = (this.div_element?.nativeElement.clientWidth ?? 600) / 1.5 - 10
+        this.mainDiv = d3.select(this.div_element?.nativeElement)
 
-        this.svg = d3
-            .select(this.div_element?.nativeElement)
+        this.containerWidth = this.div_element?.nativeElement.clientWidth ?? 600
+        this.containerHeight = (this.div_element?.nativeElement.clientHeight ?? (600 * 3) / 2) - 60
+
+        this.mainDiv.style('position', 'relative')
+
+        this.canvas = this.mainDiv
+            .append('canvas')
+            .style('position', 'absolute')
+            .style('top', 0)
+            .style('left', 0)
+            .attr('width', this.containerWidth)
+            .attr('height', this.containerHeight)
+
+        this.svg = this.mainDiv
             .append('svg')
             .attr('width', this.containerWidth)
             .attr('height', this.containerHeight)
-            .style('border', 'solid black 1px')
+            .attr('viewBox', `0 0 ${this.containerWidth} ${this.containerHeight}`)
+            .attr('preserveAspectRatio', 'xMidYMid meet')
+            .style('position', 'absolute')
+            .style('top', '0')
+            .style('left', '0')
 
-        this.density = this.svg
-            .append('g')
-            .attr('transform', 'translate(' + this.margin.left + ',' + this.margin.top + ')')
-        this.scatter = this.svg
-            .append('g')
-            .attr('transform', 'translate(' + this.margin.left + ',' + this.margin.top + ')')
+        this.scatter = this.svg.append('g').attr('class', 'scatter-group')
 
         const labels = this.prediction_probabilities[0].length
 
@@ -167,45 +189,53 @@ export class ScatterPlotComponent implements AfterViewInit {
         const ratio_width = width / length
         const ratio_height = height / length
 
-        const that = this
-        this.density
-            .selectAll('rect')
-            .data(coordinate_data)
-            .enter()
-            .append('rect')
-            .attr('x', function (d) {
-                return that.xScale(d[0])
+        const canvas = this.canvas.node() as HTMLCanvasElement
+        const ctx = canvas.getContext('2d')
+
+        if (ctx) {
+            coordinate_data.forEach((d, i) => {
+                ctx.fillStyle = `rgb(${color_data[i]}, 0.5)`
+                ctx.fillRect(this.xScale(d[0]), this.yScale(d[1]), ratio_width, ratio_height)
             })
-            .attr('y', function (d) {
-                return that.yScale(d[1])
-            })
-            .attr('width', ratio_width)
-            .attr('height', ratio_height)
-            .attr('opacity', 0.5)
-            .attr('fill', function (_, i) {
-                return d3.color(`rgb(${color_data[i]})`)
-            })
+        }
     }
 
     private drawScatterPlot(data: any[]): void {
         this.xScale = d3
             .scaleLinear()
             .domain(d3.extent(data, (d) => d[0]))
-            .range([0, this.containerWidth - this.margin.right - this.margin.left])
+            .range([this.margin.right, this.containerWidth - this.margin.left])
 
         this.yScale = d3
             .scaleLinear()
             .domain(d3.extent(data, (d) => d[1]))
-            .range([this.containerHeight - this.margin.top - this.margin.bottom, 0])
+            .range([this.containerHeight - this.margin.top, this.margin.bottom])
 
+        const circles = this.scatter
+            .append('g')
+            .attr('class', 'data-points')
+            .selectAll('.data-point')
+            .data(data)
+            .enter()
+            .append('circle')
+            .attr('class', 'data-point')
+            .attr('data-idx', (_, i) => i)
+            .attr('cx', (d: any) => this.xScale(d[0]))
+            .attr('cy', (d: any) => this.yScale(d[1]))
+            .attr('r', this.radius)
+            .attr('fill', (_, i: number) => d3.schemeDark2[this.color[i]])
+
+        this.pointInteractionHandler()
+    }
+
+    private pointInteractionHandler(): void {
         let wasDragged = false
         const that = this
+
         this.dragHandler = d3
             .drag()
             .clickDistance(Math.min(that.minDrag.x, that.minDrag.y))
             .on('start', function (this: any, d: any) {
-                console.log('dragstart')
-
                 const orgPoint = d3.select(this)
                 const clonedPoint = orgPoint.clone()
                 that.scatter.node().appendChild(clonedPoint.node())
@@ -218,13 +248,11 @@ export class ScatterPlotComponent implements AfterViewInit {
                 wasDragged = false
             })
             .on('drag', function (this: any, d: any) {
-                console.log('dragged')
                 wasDragged = true
+
                 d3.select(this).attr('cx', d.x).attr('cy', d.y)
             })
             .on('end', function (this: any, d: any) {
-                console.log('dragend')
-
                 const orgPoint = d3.select(this)
                 const referenceId = orgPoint.attr('data-idx')
                 const orgReferenceId = orgPoint.attr('previous-data-idx')
@@ -262,8 +290,7 @@ export class ScatterPlotComponent implements AfterViewInit {
                         .append('line')
                         .attr('class', 'cf-data-line')
                         .attr('stroke', 'gray')
-                        .attr('stroke-width', 2)
-                        .style('opacity', 0.6)
+                        .attr('stroke-width', that.line_stroke_width)
                         .attr('marker-end', 'url(#arrow)')
                         .attr('x1', startX)
                         .attr('y1', startY)
@@ -284,7 +311,7 @@ export class ScatterPlotComponent implements AfterViewInit {
                         // Set the gradient
                         layer
                             .append('linearGradient')
-                            .attr('id', `line-gradient-${referenceId}`)
+                            .attr('id', `line-gradient-${referenceId}-${this.uniqueIdentifier}`)
                             .attr('gradientUnits', 'userSpaceOnUse')
                             .attr('x1', startX)
                             .attr('y1', startY)
@@ -305,15 +332,13 @@ export class ScatterPlotComponent implements AfterViewInit {
                             })
 
                         cf_data_line
-                            .attr('stroke', `url(#line-gradient-${referenceId})`)
+                            .attr('stroke', `url(#line-gradient-${referenceId}-${this.uniqueIdentifier})`)
                             .attr('marker-end', `url(#arrow-${prediction})`)
                     }
 
                     const data_to_send = [[that.xScale.invert(endX), that.yScale.invert(endY)]]
                     that.projectDataAndAddToLinePlot(that.inverseProjectUrl, data_to_send, referenceId, true, callback)
                 } else {
-                    console.log('clicked')
-
                     d.sourceEvent.stopPropagation()
 
                     const idx = d3.select(this).attr('data-idx')
@@ -321,27 +346,34 @@ export class ScatterPlotComponent implements AfterViewInit {
                 }
             })
 
-        const circles = this.scatter
-            .append('g')
-            .attr('class', 'data-points')
+        this.svg
             .selectAll('.data-point')
-            .data(data)
-            .enter()
-            .append('circle')
-            .attr('class', 'data-point')
-            .attr('data-idx', (_, i) => i)
-            .attr('cx', (d: any) => this.xScale(d[0]))
-            .attr('cy', (d: any) => this.yScale(d[1]))
-            .attr('r', this.radius)
-            .attr('fill', (_, i: number) => d3.schemeDark2[this.color[i]])
-            .on('mouseover', (d: any) => {
-                const idx = d3.select(d.target).attr('data-idx')
-                this.interactionsService.setHighlightData(idx)
-            })
-            .on('mouseout', () => {
-                this.interactionsService.setHighlightData(null)
-            })
+            .on('mouseover', (d: any) => this.onMouseOver(d))
+            .on('mouseout', () => this.onMouseOut())
             .call(this.dragHandler)
+    }
+
+    onMouseOver(event: MouseEvent): void {
+        const idx = d3.select(event.target).attr('data-idx')
+        this.interactionsService.setHighlightData(idx)
+        d3.select(event.target).raise()
+
+        this.tooltipPosition.x = event.x
+        this.tooltipPosition.y = event.y
+
+        if (idx.includes('self')) {
+            this.tooltipContent = `Generated No GT`
+        } else {
+            const rounded = this.prediction_probabilities[idx].map((prop) => Math.round(prop * 100) / 100)
+            this.tooltipContent = `GT: ${this.labels[idx]} P: ${this.predictions[idx]}<br> ${rounded}`
+        }
+
+        this.showTooltip = true
+    }
+
+    onMouseOut(): void {
+        this.interactionsService.setHighlightData(null)
+        this.showTooltip = false
     }
 
     private interactionHandler(): void {
@@ -366,37 +398,35 @@ export class ScatterPlotComponent implements AfterViewInit {
 
             this.svg
                 .append('circle')
-                .attr('class', 'data-point')
+                .attr('class', 'data-point added-point')
                 .attr('data-idx', referenceId)
                 .attr('cx', x)
                 .attr('cy', y)
                 .attr('r', this.radius)
                 .attr('fill', 'black')
-                .on('mouseover', (d: any) => {
-                    const idx = d3.select(d.target).attr('data-idx')
-                    this.interactionsService.setHighlightData(idx)
-                    d3.select(d.target).raise()
-                })
-                .on('mouseout', (d: any) => {
-                    this.interactionsService.setHighlightData(null)
-                    d3.select(d.target).raise()
-                })
+            // .on('mouseover', (d: any) => {
+            //     const idx = d3.select(d.target).attr('data-idx')
+            //     this.interactionsService.setHighlightData(idx)
+            //     d3.select(d.target).raise()
+            // })
+            // .on('mouseout', (d: any) => {
+            //     this.interactionsService.setHighlightData(null)
+            //     d3.select(d.target).raise()
+            // })
+
+            this.pointInteractionHandler()
 
             this.projectDataAndAddToLinePlot(this.inverseProjectUrl, data_to_send, referenceId, true)
         })
     }
 
     private addNewDataPoint(newDataPoint: any, baseData: any): void {
-        console.log(newDataPoint)
-        console.log(baseData)
-
         const referenceId = baseData[0]
         const alreadyThereCheck = this.svg.selectAll('.data-point').filter(function (this: any) {
             return d3.select(this).attr('data-idx') === referenceId
         })
 
         if (alreadyThereCheck.size() > 0) {
-            console.log(alreadyThereCheck)
             return
         }
 
@@ -408,79 +438,144 @@ export class ScatterPlotComponent implements AfterViewInit {
 
         let newReferenceId = referenceId
         let symbol = d3.symbol(d3.symbolDiamond)
+
         const layer = this.scatter.append('g')
         if (referenceId.includes('self')) {
-            layer.attr('class', 'activation-layer').attr('data-idx', referenceId)
+            // case for just a click in the svg
+            layer.attr('class', 'generated-layer').attr('data-idx', referenceId)
             symbol = d3.symbol(d3.symbolStar)
         } else if (referenceId.includes('cf')) {
+            // case for a drag of a point in the svg or for a project of the line plot
+
+            let sliceSize = 3
+            if (referenceId.includes('icf')) {
+                // case for a project of the line plot
+                sliceSize = 4
+                symbol = d3.symbol(d3.symbolWye)
+            }
+
             const orgPoint = this.svg.selectAll('.data-point').filter(function (this: any) {
-                return d3.select(this).attr('data-idx') === referenceId.slice(3)
+                return d3.select(this).attr('data-idx') === referenceId.slice(sliceSize)
             })
 
             const orgReferenceId = orgPoint.attr('data-idx')
-            layer.attr('class', 'cf-layer').attr('data-idx', orgReferenceId)
+            layer.attr('class', 'counterfactual-layer').attr('data-idx', newReferenceId)
 
             const startX = orgPoint.attr('cx')
             const startY = orgPoint.attr('cy')
 
+            const orgColor = orgPoint.attr('fill')
+            const newColor = d3.schemeDark2[prediction]
+
             layer
-                .append('line')
-                .attr('class', 'cf-line')
-                .attr('stroke', 'gray')
-                .attr('stroke-width', 3)
+                .append('linearGradient')
+                .attr('id', `line-gradient-${newReferenceId}-${this.uniqueIdentifier}`)
+                .attr('gradientUnits', 'userSpaceOnUse')
                 .attr('x1', startX)
                 .attr('y1', startY)
                 .attr('x2', endX)
                 .attr('y2', endY)
+                .selectAll('stop')
+                .data([
+                    { offset: '0%', color: orgColor },
+                    { offset: '100%', color: newColor },
+                ])
+                .enter()
+                .append('stop')
+                .attr('offset', function (d) {
+                    return d.offset
+                })
+                .attr('stop-color', function (d) {
+                    return d.color
+                })
+
+            layer
+                .append('line')
+                .attr('class', 'cf-line')
+                .attr('x1', startX)
+                .attr('y1', startY)
+                .attr('x2', endX)
+                .attr('y2', endY)
+                .attr('stroke', `url(#line-gradient-${newReferenceId}-${this.uniqueIdentifier})`)
+                .attr('stroke-width', this.line_stroke_width)
+                .attr('marker-end', `url(#arrow-${prediction})`)
         } else {
             this.counterCF += 1
             newReferenceId = `cf-${referenceId}-${this.counterCF}`
 
-            layer.attr('class', 'cf-layer').attr('data-idx', newReferenceId)
+            layer.attr('class', 'counterfactual-layer').attr('data-idx', newReferenceId)
 
-            const oldPoint = this.svg
+            const orgPoint = this.svg
                 .selectAll('.data-point')
                 .filter(function (this: any) {
                     return d3.select(this).attr('data-idx') === referenceId
                 })
                 .clone()
 
-            const startX = d3.select(oldPoint.node()).attr('cx')
-            const startY = d3.select(oldPoint.node()).attr('cy')
+            const startX = d3.select(orgPoint.node()).attr('cx')
+            const startY = d3.select(orgPoint.node()).attr('cy')
+
+            const orgColor = orgPoint.attr('fill')
+            const newColor = d3.schemeDark2[prediction]
 
             layer
-                .append('line')
-                .attr('class', 'cf-data-line')
-                .attr('stroke', 'gray')
-                .attr('stroke-width', 3)
+                .append('linearGradient')
+                .attr('id', `line-gradient-${newReferenceId}-${this.uniqueIdentifier}`)
+                .attr('gradientUnits', 'userSpaceOnUse')
                 .attr('x1', startX)
                 .attr('y1', startY)
                 .attr('x2', endX)
                 .attr('y2', endY)
+                .selectAll('stop')
+                .data([
+                    { offset: '0%', color: orgColor },
+                    { offset: '100%', color: newColor },
+                ])
+                .enter()
+                .append('stop')
+                .attr('offset', function (d) {
+                    return d.offset
+                })
+                .attr('stop-color', function (d) {
+                    return d.color
+                })
+
+            layer
+                .append('line')
+                .attr('class', 'cf-data-line')
+                .attr('x1', startX)
+                .attr('y1', startY)
+                .attr('x2', endX)
+                .attr('y2', endY)
+                .attr('stroke', `url(#line-gradient-${newReferenceId}-${this.uniqueIdentifier})`)
+                .attr('stroke-width', this.line_stroke_width)
+                .attr('marker-end', `url(#arrow-${prediction})`)
         }
 
         layer
             .append('path')
-            .attr('class', 'data-point addedPoint')
+            .attr('class', 'data-point added-point')
             .attr('data-idx', newReferenceId)
             .attr('transform', `translate(${endX},${endY})`)
             .attr('cx', endX)
             .attr('cy', endY)
             .attr('d', symbol)
             .attr('fill', d3.schemeDark2[prediction])
-            .on('click', (d: any) => {
-                const idx = d3.select(d.target).attr('data-idx')
-                this.interactionsService.addLineData(idx)
-            })
-            .on('mouseover', (d: any) => {
-                const idx = d3.select(d.target).attr('data-idx')
-                this.interactionsService.setHighlightData(idx)
-                d3.select(d.target).raise()
-            })
-            .on('mouseout', (d: any) => {
-                this.interactionsService.setHighlightData(null)
-                d3.select(d.target).raise()
-            })
+        // .on('click', (d: any) => {
+        //     const idx = d3.select(d.target).attr('data-idx')
+        //     this.interactionsService.addLineData(idx)
+        // })
+        // .on('mouseover', (d: any) => {
+        //     const idx = d3.select(d.target).attr('data-idx')
+        //     this.interactionsService.setHighlightData(idx)
+        //     d3.select(d.target).raise()
+        // })
+        // .on('mouseout', (d: any) => {
+        //     this.interactionsService.setHighlightData(null)
+        //     d3.select(d.target).raise()
+        // })
+
+        this.pointInteractionHandler()
     }
 
     private highlightData(filterData: any): void {
@@ -502,7 +597,7 @@ export class ScatterPlotComponent implements AfterViewInit {
         }
     }
 
-    private changeColorOfPoints(mode: number = 1): void {
+    private changeColorOfPoints(mode: number = 2): void {
         if (mode === 1) {
             this.color = this.labels
         } else if (mode === 2) {
@@ -515,9 +610,10 @@ export class ScatterPlotComponent implements AfterViewInit {
 
     private clearNewAddedData(): void {
         if (this.svg) {
-            this.svg.selectAll('circle').remove()
+            // this.svg.selectAll('circle').remove()
 
-            this.svg.selectAll('.addedPoint').remove()
+            this.svg.selectAll('.added-point').remove()
+            this.svg.selectAll('.generated-layer').remove()
             this.svg.selectAll('.counterfactual-layer').remove()
         }
     }
@@ -551,7 +647,6 @@ export class ScatterPlotComponent implements AfterViewInit {
         const dataLoading = this.httpService.post<any>(url, { data: dataToSend })
         dataLoading.subscribe((data: any) => {
             const parsedData = JSON.parse(data)
-            console.log(parsedData)
             const lineData = parsedData['data'][0]
             let prediction = -1
             if ('prediction' in parsedData) {
@@ -568,10 +663,25 @@ export class ScatterPlotComponent implements AfterViewInit {
 
     private projectDataAndAddToScatterPlot(url: string, baseData: any): void {
         const dataToSend = [baseData[1]]
-        console.log(dataToSend)
         this.httpService.post<any>(url, { data: dataToSend }).subscribe((data: any) => {
             const parsedData = JSON.parse(data)
             this.addNewDataPoint(parsedData, baseData)
         })
     }
+}
+
+const cyrb53 = (str, seed = 0) => {
+    let h1 = 0xdeadbeef ^ seed,
+        h2 = 0x41c6ce57 ^ seed
+    for (let i = 0, ch; i < str.length; i++) {
+        ch = str.charCodeAt(i)
+        h1 = Math.imul(h1 ^ ch, 2654435761)
+        h2 = Math.imul(h2 ^ ch, 1597334677)
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507)
+    h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507)
+    h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+
+    return 4294967296 * (2097151 & h2) + (h1 >>> 0)
 }

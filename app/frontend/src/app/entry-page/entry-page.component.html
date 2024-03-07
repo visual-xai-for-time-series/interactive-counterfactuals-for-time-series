@@ -1,6 +1,11 @@
 <h2 mat-dialog-title>Choose an Option</h2>
 <mat-dialog-content class="options-content" style="max-height: 100%">
     <mat-grid-list cols="2" rowHeight="fit" style="height: 100%">
+        <mat-grid-tile colspan="2">
+            <button mat-raised-button color="accent" class="option-button" (click)="selectOption('Option2')">
+                Option 3
+            </button>
+        </mat-grid-tile>
         <mat-grid-tile>
             <button mat-raised-button color="primary" class="option-button" (click)="selectOption('Option1')">
                 Option 1
@@ -9,11 +14,6 @@
         <mat-grid-tile>
             <button mat-raised-button color="accent" class="option-button" (click)="selectOption('Option2')">
                 Option 2
-            </button>
-        </mat-grid-tile>
-        <mat-grid-tile colspan="2">
-            <button mat-raised-button color="accent" class="option-button" (click)="selectOption('Option2')">
-                Option 3
             </button>
         </mat-grid-tile>
     </mat-grid-list>

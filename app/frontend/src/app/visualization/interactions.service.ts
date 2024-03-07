@@ -8,13 +8,13 @@ export class InteractionsService {
     private highlightData = new BehaviorSubject(0)
     getHighlightData = this.highlightData.asObservable()
 
-    private lineData = new BehaviorSubject([0, 0, 0, 0])
+    private lineData = new BehaviorSubject<any[] | null>(null)
     getLineData = this.lineData.asObservable()
 
     private scatterData = new BehaviorSubject(null)
     getScatterData = this.scatterData.asObservable()
 
-    private colorMode = new BehaviorSubject(1)
+    private colorMode = new BehaviorSubject(2)
     getColorMode = this.colorMode.asObservable()
 
     private data
@@ -51,6 +51,8 @@ export class InteractionsService {
     }
 
     setData(data: any): void {
+        console.log(data)
+
         this.data = data
     }
 }

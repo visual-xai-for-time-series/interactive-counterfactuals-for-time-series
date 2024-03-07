@@ -21,16 +21,18 @@ substrings_to_find = ['resnet', 'cnn']
 endings_to_find = ['pt', 'pt']
 
 files = find_files(directory_to_search, substrings_to_find, endings_to_find)
+print(files)
 
 models_in_memory = {}
 def load_models():
-    print(files)
+    global models_in_memory
     for file in files:
-        print(file)
         if files[file] is not None and os.path.exists(f'{files[file][:-3]}-extracted'):
             models_in_memory[file] = torch.load(files[file])
 
+
 load_models()
+
 
 def predict_and_get_activations_from_model(data, model_name='resnet'):
     model = models_in_memory[model_name]
@@ -201,25 +203,83 @@ def generate_time_series_from_activation(data, model_name='resnet', steps=10):
     return ts_candidate, predictions
 
 
-def generate_time_series_from_attribution(data, model_name='resnet'):
+def generate_time_series_from_attribution(data, model_name='resnet', attribution=None, attribution_technqiue=DeepLift, steps=10, k_candidates=10):
     model = models_in_memory[model_name]
+    model.eval()
 
+    attribution_data = get_attributions_data()['data']
+    if attribution is None:
+        attribution = list(attribution_data.keys())[0]
 
-def generate_activation_maximization_paper(class_label, model_name='resnet'):
-    # https://www.biorxiv.org/content/biorxiv/early/2021/10/12/2021.10.10.463830.full.pdf
+    ts_base = get_time_series_data()['data']
+    att_base = np.array(attribution_data[attribution])
 
-    # Steps:
-    # 1. Find class prototype by using FFT on each sample of a class, take median, and convert it back
-    # 2. Get activation for sample
-    # 3. FFT values pertrubed by 0.001, converted back, and activations are extracted to calculcate difference
-    # 4. Change and original perturbation size are used as gradient
-    # 5. Modify FFT values by gradient and predefined step size
-    # 6. Repeat 2 to 6 for a number and take largest activation sample
-    # 7. To this for varying step size values
-    # In general, clamp by FFT borders
+    ts_values = ts_base[0]
 
-    model = models_in_memory[model_name]
+    print(ts_values.shape)
 
+    border_max = np.max(ts_values, axis=0)
+    border_min = np.min(ts_values, axis=0)
 
-def generate_activation_maximization_own(class_label, model_name='resnet'):
-    model = models_in_memory[model_name]
+    nbrs = NearestNeighbors(n_neighbors=k_candidates, algorithm='auto').fit(att_base)
+    _, indices = nbrs.kneighbors(data)
+
+    ts_candidates = np.array(ts_values)[indices[0]]
+    ts_candidate = np.mean(ts_candidates, axis=0)
+    # ts_candidate = np.random.default_rng().uniform(border_min, border_max, border_max.shape)
+
+    border_max = torch.from_numpy(border_max).float().to(device)
+    border_min = torch.from_numpy(border_min).float().to(device)
+
+    alpha = torch.tensor(0.5)
+    if border_max is not None and border_min is not None:
+        alpha = (border_max - border_min).reshape(-1) / steps
+
+    data = torch.from_numpy(data).float().to(device)
+    ts_candidate = torch.from_numpy(ts_candidate).float().to(device)
+
+    best_solution = [1000000, None]
+
+    attribution_tech = attribution_technqiue(model)
+
+    criterion = nn.MSELoss()
+    for x in range(steps):
+        ts_candidate.requires_grad_(True)
+        ts_candidate.retain_grad()
+
+        predictions = model(ts_candidate.reshape(1, 1, -1))
+        predictions = torch.argmax(predictions, axis=1)
+
+        cur_attribution = attribution_tech.attribute(ts_candidate.reshape(1, 1, -1), target=predictions)
+
+        loss = criterion(cur_attribution, data)
+        print(f'loss: {loss}')
+        if best_solution[0] > loss:
+            best_solution = [loss, ts_candidate]
+        loss = loss * -1 # fix for gradient ascent
+        loss.backward(retain_graph=True)
+
+        ts_candidate_grad = ts_candidate.grad.reshape(-1)
+        ts_candidate = torch.add(
+            ts_candidate.reshape(-1),
+            torch.mul(
+                ts_candidate_grad,
+                alpha),
+            )
+
+        # Regularization:
+        with torch.no_grad():
+            # Clamp to borders
+            ts_candidate = torch.clamp(ts_candidate, border_min, border_max)
+
+            # Random addition
+            # ts_candidate = ts_candidate.reshape(-1) * (0.2 * torch.rand(ts_candidate.reshape(-1).shape[0]) + 0.80)
+
+            # Smooth time series
+            # ts_candidate = moving_average_torch(ts_candidate.reshape(-1), 3)
+
+    ts_candidate = best_solution[1]
+    predictions = torch.argmax(model(ts_candidate.reshape(1, 1, -1)).detach().cpu(), axis=1).numpy().tolist()
+    ts_candidate = ts_candidate.detach().cpu().reshape(1, -1).numpy().tolist()
+
+    return ts_candidate, predictions

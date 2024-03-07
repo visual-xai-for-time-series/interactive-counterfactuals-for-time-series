@@ -81,4 +81,7 @@ def inverse_project_attributions_data(stage, data, attribution=None):
         attribution = list(mapper_data['attributions'][stage].keys())[0]
     mapper = mapper_data['attributions'][stage][attribution][0]
     inv_data = mapper.inverse_transform(data)
-    return {'data': inv_data}
+
+    data, predictions = generate_time_series_from_attribution(inv_data)
+
+    return {'data': data, 'prediction': predictions}

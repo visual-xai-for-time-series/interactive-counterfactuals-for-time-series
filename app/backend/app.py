@@ -43,61 +43,61 @@ def create_json_response(data):
     return JSONResponse(content=json_data)
 
 
-@app.get('/get_time_series/')
+@app.get('/api/get_time_series/')
 async def get_time_series(stage: str = 'train'):
     data = get_time_series_data(stage)
     return create_json_response(data)
 
 
-@app.get('/get_activations/')
+@app.get('/api/get_activations/')
 async def get_activations(stage: str = 'train'):
     data = get_activations_data(stage)
     return create_json_response(data)
 
 
-@app.get('/get_attributions/')
+@app.get('/api/get_attributions/')
 async def get_attributions(stage: str = 'train'):
     data = get_attributions_data(stage)
     return create_json_response(data)
 
 
-@app.get('/get_projected_time_series/')
+@app.get('/api/get_projected_time_series/')
 async def get_projected_time_series(stage: str = 'train'):
     data = get_projected_time_series_data(stage)
     return create_json_response(data)
 
 
-@app.get('/get_projected_activations/')
+@app.get('/api/get_projected_activations/')
 async def get_projected_activations(stage: str = 'train'):
     data = get_projected_activations_data(stage)
     return create_json_response(data)
 
 
-@app.get('/get_projected_attributions/')
+@app.get('/api/get_projected_attributions/')
 async def get_projected_attributions(stage: str = 'train'):
     data = get_projected_attributions_data(stage)
     return create_json_response(data)
 
 
-@app.get('/get_projected_time_series_density/')
+@app.get('/api/get_projected_time_series_density/')
 async def get_projected_time_series_density(stage: str = 'train'):
     data = get_projected_time_series_density_data(stage)
     return create_json_response(data)
 
 
-@app.get('/get_projected_activations_density/')
+@app.get('/api/get_projected_activations_density/')
 async def get_projected_activations_density(stage: str = 'train'):
     data = get_projected_activations_density_data(stage)
     return create_json_response(data)
 
 
-@app.get('/get_projected_attributions_density/')
+@app.get('/api/get_projected_attributions_density/')
 async def get_projected_attributions_density(stage: str = 'train'):
     data = get_projected_attributions_density_data(stage)
     return create_json_response(data)
 
 
-@app.post('/project_time_series/')
+@app.post('/api/project_time_series/')
 async def project_time_series(stage: str = 'train', request_body: dict = Body()):
     data = np.array(request_body['data'])
     if data.shape[-1] > 2:
@@ -107,7 +107,7 @@ async def project_time_series(stage: str = 'train', request_body: dict = Body())
         return 'Error wrong format'
 
 
-@app.post('/project_activations/')
+@app.post('/api/project_activations/')
 async def project_activations(stage: str = 'train', request_body: dict = Body()):
     data = np.array(request_body['data'])
     if data.shape[-1] > 2:
@@ -117,7 +117,7 @@ async def project_activations(stage: str = 'train', request_body: dict = Body())
         return 'Error wrong format'
 
 
-@app.post('/project_attributions/')
+@app.post('/api/project_attributions/')
 async def project_attributions(stage: str = 'train', request_body: dict = Body()):
     data = np.array(request_body['data'])
     if data.shape[-1] > 2:
@@ -127,7 +127,7 @@ async def project_attributions(stage: str = 'train', request_body: dict = Body()
         return 'Error wrong format'
 
 
-@app.post('/inverse_project_time_series/')
+@app.post('/api/inverse_project_time_series/')
 async def inverse_project_time_series(stage: str = 'train', request_body: dict = Body()):
     data = np.array(request_body['data'])
     if data.shape[-1] == 2:
@@ -137,7 +137,7 @@ async def inverse_project_time_series(stage: str = 'train', request_body: dict =
         return 'Error wrong format'
 
 
-@app.post('/inverse_project_activations/')
+@app.post('/api/inverse_project_activations/')
 async def inverse_project_activations(stage: str = 'train', request_body: dict = Body()):
     data = np.array(request_body['data'])
     if data.shape[-1] == 2:
@@ -147,7 +147,7 @@ async def inverse_project_activations(stage: str = 'train', request_body: dict =
         return 'Error wrong format'
 
 
-@app.post('/inverse_project_attributions/')
+@app.post('/api/inverse_project_attributions/')
 async def inverse_project_attributions(stage: str = 'train', request_body: dict = Body()):
     data = np.array(request_body['data'])
     if data.shape[-1] == 2:

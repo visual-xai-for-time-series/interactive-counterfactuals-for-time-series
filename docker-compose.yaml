@@ -8,7 +8,9 @@ services:
             context: app/
             dockerfile: ./../docker/Dockerfile-preprocess
         environment:
-            PYTHONUNBUFFERED: 1
+            - HOST_UID=${UID}
+            - HOST_GID=${GID}
+            - PYTHONUNBUFFERED=1
         volumes:
             # - '${DATA_PATH}:/data/'
             - './app/data-test/:/data/'

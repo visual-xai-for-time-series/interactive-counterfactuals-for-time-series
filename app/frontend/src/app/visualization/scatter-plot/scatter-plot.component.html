@@ -1,5 +1,9 @@
-<div>
+<div style="width: 100%; height: 100%; position: relative">
     <h4 *ngIf="title">{{ title }}</h4>
 
-    <div ngModel #div></div>
+    <div #div style="width: 100%; height: 100%"></div>
+
+    <div *ngIf="showTooltip" [ngStyle]="{ 'top.px': tooltipPosition.y, 'left.px': tooltipPosition.x }" class="tooltip">
+        <div [innerHTML]="tooltipContent"></div>
+    </div>
 </div>

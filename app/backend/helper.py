@@ -22,8 +22,9 @@ def find_files(directory, substrings, endings):
             for substring, ending in zip(substrings, endings):
                 if filename.endswith(ending) and substring in filename:
                     # If the conditions are met, add the file path to the dictionary
-                    matching_files[substring] = os.path.join(root, filename)
-                    break  # Break the inner loop to prevent duplicates
+                    if matching_files[substring] is None:
+                        matching_files[substring] = os.path.join(root, filename)
+                        break  # Break the inner loop to prevent duplicates
 
     return matching_files
 
