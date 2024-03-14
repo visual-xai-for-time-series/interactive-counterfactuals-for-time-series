@@ -1,10 +1,8 @@
 #!/bin/bash
 
 # Basic settings for the model
-# models=("resnet" "cnn")
-# datasets=("ECG5000" "FordA" "FordB")
-models=("resnet")
-datasets=("ECG5000" "FordA")
+models=("resnet" "cnn")
+datasets=("ECG5000" "FordA" "FordB")
 
 # Base path for the processed data
 path="/data/"

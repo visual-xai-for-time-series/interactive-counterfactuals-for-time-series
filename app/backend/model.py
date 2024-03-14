@@ -20,16 +20,18 @@ directory_to_search = '/data/'
 substrings_to_find = ['resnet', 'cnn']
 endings_to_find = ['pt', 'pt']
 
-files = find_files(directory_to_search, substrings_to_find, endings_to_find)
-print(files)
 
 models_in_memory = {}
 def load_models():
-    global models_in_memory
+    files = find_files(directory_to_search, substrings_to_find, endings_to_find)
+
     for file in files:
         if files[file] is not None and os.path.exists(f'{files[file][:-3]}-extracted'):
             models_in_memory[file] = torch.load(files[file])
 
+
+def get_possible_models():
+    return models_in_memory
 
 load_models()
 

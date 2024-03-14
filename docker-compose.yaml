@@ -12,8 +12,8 @@ services:
             - HOST_GID=${GID}
             - PYTHONUNBUFFERED=1
         volumes:
-            # - '${DATA_PATH}:/data/'
-            - './app/data-test/:/data/'
+            - '${DATA_PATH}:/data/'
+            # - './app/data-test/:/data/'
 
     frontend:
         build:

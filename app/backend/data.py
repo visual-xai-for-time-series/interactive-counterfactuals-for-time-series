@@ -3,13 +3,30 @@ import dill
 from helper import *
 
 
-directory_to_search = '/data/resnet-ecg5000-extracted/'
-# directory_to_search = '/data/resnet-forda-extracted/'
 substrings_to_find = ['data', 'activations', 'attributions', 'mappers', 'density']
 endings_to_find = ['pkl', 'pkl', 'pkl', 'pkl', 'pkl']
 
-files = find_files(directory_to_search, substrings_to_find, endings_to_find)
-print(files)
+base_path = '/data/'
+
+base = 'resnet-ecg5000'
+# base = 'resnet-forda'
+files = None
+
+directories_found = {}
+def get_directories(path):
+    global files
+    directories = [os.path.join(path, name) for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
+
+    for directory_to_search in directories:
+        directory_files = find_files(directory_to_search, substrings_to_find, endings_to_find)
+        directories_found[directory_to_search] = directory_files
+
+    print(f'Found:\n{directories_found}')
+    for k in directories_found:
+        if base in k:
+            files = directories_found[k]
+            break
+
 
 data_in_memory = {}
 def get_data_from_path(path, load_in_memory=True):
@@ -113,5 +130,40 @@ def preload():
 
     get_projected_time_series_density_data()
 
+
+def download_data(url, local_filename):
+    if not os.path.exists(local_filename):
+        dir_name = os.path.dirname(local_filename)
+        os.makedirs(dir_name, exist_ok=True)
+
+        with urllib.request.urlopen(url) as response, open(local_filename, 'wb') as out_file:
+            data = response.read()
+            out_file.write(data)
+        
+        print(f'Download finished: {local_filename}')
+    else:
+        print(f'File already exists: {local_filename}')
+
+
+def download_all_files(path):
+    resnet_ecg5000 = [
+        ('https://data.time-series-xai.dbvis.de/icfts/resnet-ecg5000.pt', 'resnet-ecg5000.pt'),
+        ('https://data.time-series-xai.dbvis.de/icfts/resnet-ecg5000-extracted/resnet-ecg5000-activations.pkl', 'resnet-ecg5000-extracted/resnet-ecg5000-activations.pkl'),
+        ('https://data.time-series-xai.dbvis.de/icfts/resnet-ecg5000-extracted/resnet-ecg5000-attributions.pkl', 'resnet-ecg5000-extracted/resnet-ecg5000-attributions.pkl'),
+        ('https://data.time-series-xai.dbvis.de/icfts/resnet-ecg5000-extracted/resnet-ecg5000-data.pkl', 'resnet-ecg5000-extracted/resnet-ecg5000-data.pkl'),
+        ('https://data.time-series-xai.dbvis.de/icfts/resnet-ecg5000-extracted/resnet-ecg5000-density.pkl', 'resnet-ecg5000-extracted/resnet-ecg5000-density.pkl'),
+        ('https://data.time-series-xai.dbvis.de/icfts/resnet-ecg5000-extracted/resnet-ecg5000-mappers.pkl', 'resnet-ecg5000-extracted/resnet-ecg5000-mappers.pkl'),
+    ]
+
+    files = [resnet_ecg5000]
+    for file in files:
+        if isinstance(file, list):
+            for link in file:
+                download_data(link[0], os.path.join(path, link[1]))
+
+
+download_all_files(base_path)
+
+get_directories('/data/')
 
 preload()

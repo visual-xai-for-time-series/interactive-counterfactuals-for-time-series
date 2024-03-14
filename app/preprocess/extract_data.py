@@ -22,7 +22,7 @@ import torch.nn as nn
 
 from torch.utils.data import Dataset, DataLoader
 
-from captum.attr import GradientShap, IntegratedGradients, ShapleyValueSampling, Saliency, DeepLift
+from captum.attr import GradientShap, IntegratedGradients, ShapleyValueSampling, Saliency, DeepLift, DeepLiftShap
 
 from sklearn.preprocessing import OneHotEncoder
 
@@ -249,13 +249,21 @@ def main():
     sample, label = dataset_train[0]
     shape = sample.reshape(1, -1).shape
 
+    torch.manual_seed(random_seed)
+    baselines = torch.from_numpy(np.array([dataset_train[torch.randint(len(dataset_train), (1,))][0] for _ in range(10)])).reshape(-1, *shape).float().to(device)
+
     attribution_techniques = [
-        # ['Saliency', Saliency],
-        ['DeepLift', DeepLift],
-        # ['IntegratedGradients', IntegratedGradients],
-        # ['ShapleyValueSampling', ShapleyValueSampling],
+        # ['LRP', LRP],
+        # ['Saliency', Saliency, {}],
+        # ['InputXGradient', InputXGradient, {}],
+        # ['DeepLift', DeepLift, {}],
+        ['DeepLiftShap', DeepLiftShap, {'baselines': baselines}],
+        # ['IntegratedGradients', IntegratedGradients, {}],
+        # ['GradientShap', GradientShap, {'baselines': baselines}],
+        # ['ShapleyValueSampling', ShapleyValueSampling, {}],
+        # ['Occlusion', Occlusion, {'sliding_window_shapes': (1, 5)}],
     ]
-    attribution_techniques_dict = {k: v for k, v in attribution_techniques}
+    attribution_techniques_dict = {k: [v, vv] for k, v, vv in attribution_techniques}
 
     attributions_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-attributions.pkl')
     if os.path.exists(attributions_path):
@@ -270,7 +278,7 @@ def main():
 
         for at in attribution_techniques:
         
-            at_name, at_function = at
+            at_name, at_function, at_kwargs = at
             attribute_tec = at_function(model)
 
             print(f'Calculcate: {at_name}')
@@ -283,7 +291,7 @@ def main():
                 input_ = input_.float().to(device)
                 label_ = label_.float().to(device)
 
-                attribution = attribute_tec.attribute(input_.reshape(-1, *shape).float().to(device), target=torch.argmax(label_, axis=1))
+                attribution = attribute_tec.attribute(input_.reshape(-1, *shape), target=torch.argmax(label_, axis=1), **at_kwargs)
                 attributions_tmp.extend(attribution)
 
             attributions_tmp = torch.stack(attributions_tmp)
@@ -299,7 +307,7 @@ def main():
                 input_ = input_.float().to(device)
                 label_ = label_.float().to(device)
 
-                attribution = attribute_tec.attribute(input_.reshape(-1, *shape).float().to(device), target=torch.argmax(label_, axis=1))
+                attribution = attribute_tec.attribute(input_.reshape(-1, *shape), target=torch.argmax(label_, axis=1), **at_kwargs)
                 attributions_tmp.extend(attribution)
 
             attributions_tmp = torch.stack(attributions_tmp)

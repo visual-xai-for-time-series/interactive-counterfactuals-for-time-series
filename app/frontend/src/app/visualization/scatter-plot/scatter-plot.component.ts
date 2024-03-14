@@ -25,10 +25,12 @@ export class ScatterPlotComponent implements AfterViewInit {
     private mainDiv
 
     private svg
-    private density
     private scatter
 
     private canvas
+
+    private dataScatter
+    private dataDensity
 
     private dataUrl
     private densityUrl
@@ -111,6 +113,7 @@ export class ScatterPlotComponent implements AfterViewInit {
     }
 
     private createSVG(): void {
+        console.log('Initalize SVG')
         this.mainDiv = d3.select(this.div_element?.nativeElement)
 
         this.containerWidth = this.div_element?.nativeElement.clientWidth ?? 600
@@ -302,6 +305,8 @@ export class ScatterPlotComponent implements AfterViewInit {
 
                     // Predict new
                     const callback = (data) => {
+                        // that.interactionsService.addLineData(referenceId)
+
                         const prediction = parseInt(data['prediction'][0])
                         const orgColor = orgPoint.attr('fill')
                         orgPoint.attr('org-fill', orgPoint.attr('fill'))
@@ -311,7 +316,7 @@ export class ScatterPlotComponent implements AfterViewInit {
                         // Set the gradient
                         layer
                             .append('linearGradient')
-                            .attr('id', `line-gradient-${referenceId}-${this.uniqueIdentifier}`)
+                            .attr('id', `line-gradient-${referenceId}-${that.uniqueIdentifier}`)
                             .attr('gradientUnits', 'userSpaceOnUse')
                             .attr('x1', startX)
                             .attr('y1', startY)
@@ -332,9 +337,11 @@ export class ScatterPlotComponent implements AfterViewInit {
                             })
 
                         cf_data_line
-                            .attr('stroke', `url(#line-gradient-${referenceId}-${this.uniqueIdentifier})`)
+                            .attr('stroke', `url(#line-gradient-${referenceId}-${that.uniqueIdentifier})`)
                             .attr('marker-end', `url(#arrow-${prediction})`)
                     }
+
+                    that.pointInteractionHandler()
 
                     const data_to_send = [[that.xScale.invert(endX), that.yScale.invert(endY)]]
                     that.projectDataAndAddToLinePlot(that.inverseProjectUrl, data_to_send, referenceId, true, callback)
@@ -396,7 +403,7 @@ export class ScatterPlotComponent implements AfterViewInit {
 
             const data_to_send = [[this.xScale.invert(x), this.yScale.invert(y)]]
 
-            this.svg
+            this.scatter
                 .append('circle')
                 .attr('class', 'data-point added-point')
                 .attr('data-idx', referenceId)
@@ -612,24 +619,40 @@ export class ScatterPlotComponent implements AfterViewInit {
         if (this.svg) {
             // this.svg.selectAll('circle').remove()
 
-            this.svg.selectAll('.added-point').remove()
-            this.svg.selectAll('.generated-layer').remove()
-            this.svg.selectAll('.counterfactual-layer').remove()
+            // this.svg.selectAll('.added-point').remove()
+            // this.svg.selectAll('.generated-layer').remove()
+            // this.svg.selectAll('.counterfactual-layer').remove()
+
+            this.scatter.selectAll('*').remove()
+
+            const canvas = this.canvas.node() as HTMLCanvasElement
+            const ctx = canvas.getContext('2d')
+
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+            }
+
+            this.drawScatterPlot(this.dataScatter)
+            this.drawDensityPlot(this.dataDensity)
         }
     }
 
+    // --------------
+    // Fetching data
+
     private fetchDataAndAddToScatterPlot(): void {
-        console.log('Initalize SVG')
         this.createSVG()
 
-        const dataPromise = this.httpService.get<any>(this.dataUrl)
-        const densityPromise = this.httpService.get<any>(this.densityUrl)
-        dataPromise.subscribe((data: any) => {
+        const scatterObservable = this.httpService.get<any>(this.dataUrl)
+        const densityObservable = this.httpService.get<any>(this.densityUrl)
+        scatterObservable.subscribe((data: any) => {
             const receivedData = JSON.parse(data)
+            this.dataScatter = receivedData['data']
             this.drawScatterPlot(receivedData['data'])
 
-            densityPromise.subscribe((data: any) => {
+            densityObservable.subscribe((data: any) => {
                 const receivedData = JSON.parse(data)
+                this.dataDensity = receivedData['data']
                 this.drawDensityPlot(receivedData['data'])
 
                 this.interactionHandler()

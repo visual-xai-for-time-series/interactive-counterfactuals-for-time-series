@@ -148,6 +148,7 @@ def get_time_series_from_attributions(model, attribution, time_series_shape, att
     if border_max is not None and border_min is not None:
         alpha = (border_max - border_min).reshape(-1) / steps
 
+    attribution_technqiue, attribution_technqiue_kwargs = attribution_technqiue
     attribution_tech = attribution_technqiue(model)
 
     criterion = nn.MSELoss()
@@ -158,7 +159,7 @@ def get_time_series_from_attributions(model, attribution, time_series_shape, att
         predictions = model(ts_candidate.reshape(time_series_shape))
         predictions = torch.argmax(predictions, axis=1)
 
-        cur_attribution = attribution_tech.attribute(ts_candidate.reshape(time_series_shape), target=predictions)
+        cur_attribution = attribution_tech.attribute(ts_candidate.reshape(time_series_shape), target=predictions, **attribution_technqiue_kwargs)
 
         loss = criterion(cur_attribution.flatten(), attribution.flatten())
         if best_solution[0] > loss:
