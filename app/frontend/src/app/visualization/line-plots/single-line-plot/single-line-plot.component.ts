@@ -111,7 +111,6 @@ export class SingleLinePlotComponent {
 
     private addLine(data_with_labels: any[]): void {
         this.lineData = data_with_labels
-        console.log(data_with_labels)
 
         const idx = this.lineData[0]
         const data = this.lineData[1]
@@ -155,8 +154,6 @@ export class SingleLinePlotComponent {
         const that = this
         function dragged(this: any, d: any) {
             const extent = d3.extent(that.yScale.range())
-            console.log(d)
-            console.log(extent)
 
             if (d.y > extent[0] && d.y < extent[1]) {
                 that.lineData[1][parseInt(d3.select(this).attr('tp'))] = that.yScale.invert(d.y)
@@ -212,7 +209,7 @@ export class SingleLinePlotComponent {
 
     public removeLine(): void {
         this.lineData = [0, 0, 0, 0]
-        this.linePlotted = true
+        this.linePlotted = false
         this.lineModified = false
 
         this.svg.selectAll('.data-line').remove()

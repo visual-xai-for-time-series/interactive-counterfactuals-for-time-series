@@ -12,7 +12,7 @@ RUN yarn build
 # main container
 FROM python:3.10
 
-COPY --from=build-step /app/build /var/www/html
+COPY --from=build-step /app/dist/icfts /var/www/html
 
 RUN mkdir -p /app
 WORKDIR /app

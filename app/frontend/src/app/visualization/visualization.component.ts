@@ -15,7 +15,7 @@ import { LinePlotsComponent } from './line-plots/line-plots.component'
 import { InteractionsService } from './interactions.service'
 import { HttpService } from './http.service'
 
-import * as d3 from 'd3'
+import { environment } from '../../environments/environment'
 
 @Component({
     selector: 'app-visualization',
@@ -41,35 +41,39 @@ export class VisualizationComponent implements OnInit {
 
     public isRequestPending = true
 
-    projectedTimeSeries = [
+    private baseUrl = environment.apiURL
+
+    public projectedTimeSeries = [
         'Projected Time Series',
-        'http://localhost:8000/api/get_projected_time_series/?stage=' + this.stage,
-        'http://localhost:8000/api/get_projected_time_series_density/?stage=' + this.stage,
-        'http://localhost:8000/api/project_time_series/?stage=' + this.stage,
-        'http://localhost:8000/api/inverse_project_time_series/?stage=' + this.stage,
+        this.baseUrl + '/api/get_projected_time_series/?stage=' + this.stage,
+        this.baseUrl + '/api/get_projected_time_series_density/?stage=' + this.stage,
+        this.baseUrl + '/api/project_time_series/?stage=' + this.stage,
+        this.baseUrl + '/api/inverse_project_time_series/?stage=' + this.stage,
     ]
-    projectedActivations = [
+    public projectedActivations = [
         'Projected Activations',
-        'http://localhost:8000/api/get_projected_activations/?stage=' + this.stage,
-        'http://localhost:8000/api/get_projected_activations_density/?stage=' + this.stage,
-        'http://localhost:8000/api/project_activations/?stage=' + this.stage,
-        'http://localhost:8000/api/inverse_project_activations/?stage=' + this.stage,
+        this.baseUrl + '/api/get_projected_activations/?stage=' + this.stage,
+        this.baseUrl + '/api/get_projected_activations_density/?stage=' + this.stage,
+        this.baseUrl + '/api/project_activations/?stage=' + this.stage,
+        this.baseUrl + '/api/inverse_project_activations/?stage=' + this.stage,
     ]
-    projectedAttributions = [
+    public projectedAttributions = [
         'Projected Attributions',
-        'http://localhost:8000/api/get_projected_attributions/?stage=' + this.stage,
-        'http://localhost:8000/api/get_projected_attributions_density/?stage=' + this.stage,
-        'http://localhost:8000/api/project_attributions/?stage=' + this.stage,
-        'http://localhost:8000/api/inverse_project_attributions/?stage=' + this.stage,
+        this.baseUrl + '/api/get_projected_attributions/?stage=' + this.stage,
+        this.baseUrl + '/api/get_projected_attributions_density/?stage=' + this.stage,
+        this.baseUrl + '/api/project_attributions/?stage=' + this.stage,
+        this.baseUrl + '/api/inverse_project_attributions/?stage=' + this.stage,
     ]
 
-    originalTimeSeries = 'http://localhost:8000/api/get_time_series/?stage=' + this.stage
+    public originalTimeSeries = this.baseUrl + '/api/get_time_series/?stage=' + this.stage
+    public firstDataLoaded = false
 
     constructor(private httpService: HttpService, private interactionsService: InteractionsService) {}
 
-    firstDataLoaded = false
-
     ngOnInit(): void {
+        console.log(this.baseUrl)
+        this.firstDataLoaded = false
+
         this.httpService.get<any>(this.originalTimeSeries).subscribe((data: any) => {
             const parsed_data = JSON.parse(data)
             this.interactionsService.setData(parsed_data['data'])

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Basic settings for the model
-models=("resnet" "cnn")
-datasets=("ECG5000" "FordA" "FordB")
+models=("resnet") # "cnn"
+datasets=("ECG5000" "FordA") # "FordB"
 
 # Base path for the processed data
 path="/data/"
@@ -14,6 +14,8 @@ for model in "${models[@]}"; do
         # Convert model and dataset names to lower case
         model_lowercase=$(echo "$model" | tr '[:upper:]' '[:lower:]')
         dataset_lowercase=$(echo "$dataset" | tr '[:upper:]' '[:lower:]')
+
+        echo "Looking for $model_lowercase-$dataset_lowercase.pt"
 
         # Check how large the files are and what is even in the subdirectories
         du -ah "$path"

@@ -305,7 +305,7 @@ export class ScatterPlotComponent implements AfterViewInit {
 
                     // Predict new
                     const callback = (data) => {
-                        // that.interactionsService.addLineData(referenceId)
+                        that.interactionsService.addLineData(orgReferenceId)
 
                         const prediction = parseInt(data['prediction'][0])
                         const orgColor = orgPoint.attr('fill')
@@ -370,7 +370,7 @@ export class ScatterPlotComponent implements AfterViewInit {
 
         if (idx.includes('self')) {
             this.tooltipContent = `Generated No GT`
-        } else {
+        } else if (this.prediction_probabilities[idx]) {
             const rounded = this.prediction_probabilities[idx].map((prop) => Math.round(prop * 100) / 100)
             this.tooltipContent = `GT: ${this.labels[idx]} P: ${this.predictions[idx]}<br> ${rounded}`
         }

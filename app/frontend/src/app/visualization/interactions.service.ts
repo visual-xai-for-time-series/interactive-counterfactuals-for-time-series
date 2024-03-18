@@ -31,6 +31,8 @@ export class InteractionsService {
 
     addLineData(idx: any): void {
         let tmp = [idx, this.data[0][idx], this.data[1][idx], this.data[2][idx]]
+        console.log(tmp)
+
         this.lineData.next(tmp)
     }
 

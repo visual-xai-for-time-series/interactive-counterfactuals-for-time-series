@@ -1,34 +1,70 @@
 # Interactive Counterfactual Generation for Univariate Time Series
 
-[Short description of your application]
+This repository hosts the official implementation of the "Interactive Counterfactual Generation for Univariate Time Series" application, as presented in our paper for the EuroVis Workshop on Visual Analytics 2024.
+Our work introduces an interactive visual analytics application for generating counterfactual explanations in univariate time series data, aimed at enhancing the interpretability of deep learning models.
 
-## Table of Contents
+## Introduction
 
-- [Demo](#demo)
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
+With the increasing complexity of deep learning models in time series analysis, understanding the decision-making process behind these models becomes crucial.
+Our application leverages 2D decision maps and inverse projection techniques, allowing users to interactively explore and manipulate data points to generate intuitive counterfactual explanations.
+This approach aids in demystifying model predictions and fosters a deeper understanding of model behaviors.
 
-## Demo
+## Key Features
 
-[Include a link or GIF demonstrating your application in action]
+-   **Interactive 2D Decision Maps**: Visualize the projections of time series data, activations, and attributions, enabling a simplified exploration of complex data.
+-   **Counterfactual Explanation Generation**: Manipulate data points directly in the visualization to explore hypothetical scenarios and their outcomes.
+-   **Deep Learning Insights**: Dive into model activations and attributions to uncover the rationale behind predictions.
+-   **User-Centered Design**: A straightforward interface allows users to effortlessly generate and understand counterfactuals.
 
-## Features
+## Getting Started
 
-- [Feature 1]
-- [Feature 2]
-- [Feature 3]
-- ...
+### Prerequisites
 
-## Installation
+Ensure you have the following installed:
 
-[Provide instructions on how to install and run your application]
+-   Python 3.8 or newer
+-   Required Python packages: `numpy`, `pandas`, `torch`, `umap-learn`, `matplotlib`
+-   Docker
+
+### Installation
+
+Clone this repository:
 
 ```bash
-git clone [repository URL]
-cd [repository directory]
-# Run installation commands if any
-docker compose up --build
+git clone https://github.com/visual-xai-for-time-series/interactive-counterfactuals-for-time-series.git
+cd interactive-counterfactuals-for-time-series
 ```
+
+### Running the Application
+
+To run the application, execute the following command from the root directory of the project:
+
+```bash
+docker compose up
+```
+
+or
+
+```bash
+bash start_development.bash
+```
+
+Follow the instructions in the terminal to open the application in your web browser.
+
+## License
+
+This project is licensed under the MIT License - see the `LICENSE` file for details.
+
+## Citation
+
+If you find this application useful for your research, please consider citing our paper:
+
+```bibtex
+@inproceedings{interactive-counterfactual-generation,
+  title={Interactive Counterfactual Generation for Univariate Time Series},
+  author={Schlegel, Udo and Keim, Daniel A.},
+  booktitle={EuroVis Workshop on Visual Analytics},
+  year={2024}
+}
+```
+

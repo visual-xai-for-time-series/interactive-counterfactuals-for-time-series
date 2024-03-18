@@ -13,7 +13,6 @@ services:
             - PYTHONUNBUFFERED=1
         volumes:
             - '${DATA_PATH}:/data/'
-            # - './app/data-test/:/data/'
 
     frontend:
         build:
@@ -24,9 +23,9 @@ services:
             - '/app/node_modules/'
         ports:
             - 4200:4200
-        # depends_on:
-        #     preprocess:
-        #         condition: service_completed_successfully
+        depends_on:
+            preprocess:
+                condition: service_completed_successfully
 
     backend:
         build:
@@ -40,7 +39,7 @@ services:
             - 8000:8000
         environment:
             PYTHONUNBUFFERED: 1
-        # depends_on:
-        #     preprocess:
-        #         condition: service_completed_successfully
+        depends_on:
+            preprocess:
+                condition: service_completed_successfully
 
