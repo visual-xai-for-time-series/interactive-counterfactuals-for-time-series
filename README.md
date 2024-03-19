@@ -3,6 +3,10 @@
 This repository hosts the official implementation of the "Interactive Counterfactual Generation for Univariate Time Series" application, as presented in our paper for the EuroVis Workshop on Visual Analytics 2024.
 Our work introduces an interactive visual analytics application for generating counterfactual explanations in univariate time series data, aimed at enhancing the interpretability of deep learning models.
 
+Demo: https://icfts.time-series-xai.dbvis.de/
+
+![Teaser ICFTS](images/teaser.png)
+
 ## Introduction
 
 With the increasing complexity of deep learning models in time series analysis, understanding the decision-making process behind these models becomes crucial.
