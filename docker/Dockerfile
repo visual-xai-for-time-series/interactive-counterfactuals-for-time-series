@@ -9,12 +9,12 @@ COPY ./app/frontend /app
 RUN yarn
 RUN yarn build
 
-RUN ls -al /app/dist/icfts
+RUN ls -al /app/dist/icfts/browser
 
 # main container
 FROM python:3.10
 
-COPY --from=build-step /app/dist/icfts /var/www/html
+COPY --from=build-step /app/dist/icfts/browser /var/www/html
 
 RUN mkdir -p /app
 RUN mkdir -p /data
