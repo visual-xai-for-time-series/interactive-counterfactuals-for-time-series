@@ -21,23 +21,49 @@ substrings_to_find = ['resnet', 'cnn']
 endings_to_find = ['pt', 'pt']
 
 
-models_in_memory = {}
-def load_models():
-    files = find_files(directory_to_search, substrings_to_find, endings_to_find)
+class ModelsInMemory:
+    selected_model = None
 
-    for file in files:
-        if files[file] is not None and os.path.exists(f'{files[file][:-3]}-extracted'):
-            models_in_memory[file] = torch.load(files[file])
+    models_in_memory = {}
+
+    def __init__(self, selected_model='resnet-ecg5000'):
+        files = find_files(directory_to_search, substrings_to_find, endings_to_find)
+        for base_name, file_path in files.items():
+            if isinstance(file_path, list):
+                for file_name in file_path:
+                    if file_name is not None:
+                        file_base_name = file_name[:-3]
+                        if os.path.exists(f'{file_base_name}-extracted'):
+                            self.models_in_memory[file_base_name] = torch.load(file_name)
+
+        print(f'Found models: {list(self.models_in_memory.keys())}')
+
+        self.change_model(selected_model)
 
 
-def get_possible_models():
-    return models_in_memory
+    def __call__(self, selected_model=None):
+        if selected_model in self.models_in_memory:
+            self.selected_model = selected_model
+        return self.models_in_memory[self.selected_model]
 
-load_models()
+
+    def change_model(self, selected_model='resnet-ecg5000'):
+        if selected_model is None:
+            self.selected_model = list(self.models_in_memory.keys())[0]
+        else:
+            self.selected_model = [x for x in self.models_in_memory.keys() if selected_model in x][0]
+        print(f'Selected model: {self.selected_model}')
 
 
-def predict_and_get_activations_from_model(data, model_name='resnet'):
-    model = models_in_memory[model_name]
+    def get_possible_models():
+        return list(self.models_in_memory.keys())
+
+
+models_in_memory = ModelsInMemory()
+
+
+def predict_and_get_activations_from_model(data):
+    model = models_in_memory()
     model.eval()
 
     activations = {}
@@ -65,36 +91,46 @@ def predict_and_get_activations_from_model(data, model_name='resnet'):
 
     possible_layers_to_look_at = get_last_layer(model)
     layer_to_look_at = possible_layers_to_look_at[-2]
-    fc1_handle = layer_to_look_at.register_forward_hook(get_activation('new'))
+    activation_handle = layer_to_look_at.register_forward_hook(get_activation('new'))
 
     data = torch.from_numpy(data).reshape(1, 1, -1).float().to(device)
     predictions = torch.argmax(model(data).detach().cpu(), axis=1).numpy().tolist()
 
-    fc1_handle.remove()
+    activation_handle.remove()
 
     return activations['new'], predictions
 
 
-def predict_and_get_attributions_from_model(data, model_name='resnet'):
-    model = models_in_memory[model_name]
+def predict_and_get_attributions_from_model(data, attribution=None, baseline_samples=10):
+    model = models_in_memory()
     model.eval()
 
     data = torch.from_numpy(data).reshape(1, 1, -1).float().to(device)
+    shape = list(data.shape)
     data.requires_grad_(True)
 
     predictions = torch.argmax(model(data), axis=1)
 
-    explainer = DeepLift(model)
-    attribution = explainer.attribute(data, target=predictions)
-    attribution = attribution.detach().cpu().reshape(1, -1).numpy()
+    attribution_data = get_attributions_data()['data']
+    if attribution is None:
+        attribution = list(attribution_data.keys())[0]
+    attribution_technqiue = name_to_class(attribution)
+
+    dataset = get_time_series_data()['data'][0]
+    random_samples = np.random.randint(0, shape[0], size=baseline_samples)
+    baselines = torch.from_numpy(dataset[random_samples]).reshape(-1, *shape[1:]).float().to(device)
+
+    attribution_technqiue_called = attribution_technqiue(model)
+    attributions = attribution_technqiue_called.attribute(data, target=predictions, baselines=baselines)
+    attributions = attributions.detach().cpu().reshape(1, -1).numpy()
 
     predictions = predictions.detach().cpu().numpy().tolist()
 
-    return attribution, predictions
+    return attributions, predictions
 
 
-def predict_using_model(data, model_name='resnet'):
-    model = models_in_memory[model_name]
+def predict_using_model(data):
+    model = models_in_memory()
     model.eval()
 
     data = torch.from_numpy(data).reshape(1, 1, -1).float().to(device)
@@ -104,8 +140,8 @@ def predict_using_model(data, model_name='resnet'):
     return predictions
 
 
-def generate_time_series_from_activation(data, model_name='resnet', steps=10):
-    model = models_in_memory[model_name]
+def generate_time_series_from_activation(data, steps=10):
+    model = models_in_memory()
     model.eval()
 
     cur_activations = {}
@@ -117,27 +153,15 @@ def generate_time_series_from_activation(data, model_name='resnet', steps=10):
             dict_to_save[name_to_save] = output_transformed
         return hook
 
-    def get_last_layer(model):
-        possible_layers = []
-        for layer in model.children():
-            if isinstance(layer, (nn.Linear, nn.Conv1d, nn.Conv2d, nn.ConvTranspose2d)):
-                possible_layers.append(layer)
-            elif isinstance(layer, nn.Sequential):
-                possible_layers.extend(get_last_layer(layer))
-            elif isinstance(layer, nn.Module):
-                possible_layers.extend(get_last_layer(layer))
-        return possible_layers
-
     possible_layers_to_look_at = get_last_layer(model)
     layer_to_look_at = possible_layers_to_look_at[-2]
-    fc1_handle = layer_to_look_at.register_forward_hook(get_activation(cur_activations, 'layer_to_look_at'))
+    hook_callback = get_activation(cur_activations, 'layer_to_look_at')
+    activation_handle = layer_to_look_at.register_forward_hook(hook_callback)
 
     ts_base = get_time_series_data()['data']
     act_base = np.array(get_activations_data()['data'])
 
     ts_values = ts_base[0]
-
-    print(ts_values.shape)
 
     border_max = np.max(ts_values, axis=0)
     border_min = np.min(ts_values, axis=0)
@@ -148,7 +172,6 @@ def generate_time_series_from_activation(data, model_name='resnet', steps=10):
 
     ts_candidates = np.array(ts_values)[indices[0]]
     ts_candidate = np.mean(ts_candidates, axis=0)
-    # ts_candidate = np.random.default_rng().uniform(border_min, border_max, border_max.shape)
 
     border_max = torch.from_numpy(border_max).float().to(device)
     border_min = torch.from_numpy(border_min).float().to(device)
@@ -172,7 +195,7 @@ def generate_time_series_from_activation(data, model_name='resnet', steps=10):
         cur_activation = cur_activations['layer_to_look_at'].reshape(data.shape)
 
         loss = criterion(cur_activation, data)
-        print(f'loss: {loss}')
+        # print(f'loss: {loss}')
         if best_solution[0] > loss:
             best_solution = [loss, ts_candidate]
         loss = loss * -1 # fix for gradient ascent
@@ -200,25 +223,29 @@ def generate_time_series_from_activation(data, model_name='resnet', steps=10):
     ts_candidate = best_solution[1]
     predictions = torch.argmax(model(ts_candidate.reshape(1, 1, -1)).detach().cpu(), axis=1).numpy().tolist()
     ts_candidate = ts_candidate.detach().cpu().reshape(1, -1).numpy().tolist()
-    fc1_handle.remove()
+    activation_handle.remove()
 
     return ts_candidate, predictions
 
 
-def generate_time_series_from_attribution(data, model_name='resnet', attribution=None, attribution_technqiue=DeepLift, steps=10, k_candidates=10):
-    model = models_in_memory[model_name]
+def generate_time_series_from_attribution(data, attribution=None, baseline_samples=10, steps=10, k_candidates=10):
+    model = models_in_memory()
     model.eval()
 
     attribution_data = get_attributions_data()['data']
     if attribution is None:
         attribution = list(attribution_data.keys())[0]
+    attribution_technqiue = name_to_class(attribution)
 
     ts_base = get_time_series_data()['data']
     att_base = np.array(attribution_data[attribution])
 
     ts_values = ts_base[0]
+    shape = list(ts_values.shape)
 
-    print(ts_values.shape)
+    dataset = ts_values
+    random_samples = np.random.randint(0, shape[0], size=baseline_samples)
+    baselines = torch.from_numpy(dataset[random_samples]).reshape(-1, 1, shape[-1]).float().to(device)
 
     border_max = np.max(ts_values, axis=0)
     border_min = np.min(ts_values, axis=0)
@@ -228,7 +255,6 @@ def generate_time_series_from_attribution(data, model_name='resnet', attribution
 
     ts_candidates = np.array(ts_values)[indices[0]]
     ts_candidate = np.mean(ts_candidates, axis=0)
-    # ts_candidate = np.random.default_rng().uniform(border_min, border_max, border_max.shape)
 
     border_max = torch.from_numpy(border_max).float().to(device)
     border_min = torch.from_numpy(border_min).float().to(device)
@@ -252,10 +278,10 @@ def generate_time_series_from_attribution(data, model_name='resnet', attribution
         predictions = model(ts_candidate.reshape(1, 1, -1))
         predictions = torch.argmax(predictions, axis=1)
 
-        cur_attribution = attribution_tech.attribute(ts_candidate.reshape(1, 1, -1), target=predictions)
+        cur_attribution = attribution_tech.attribute(ts_candidate.reshape(1, 1, -1), target=predictions, baselines=baselines)
 
         loss = criterion(cur_attribution, data)
-        print(f'loss: {loss}')
+        # print(f'loss: {loss}')
         if best_solution[0] > loss:
             best_solution = [loss, ts_candidate]
         loss = loss * -1 # fix for gradient ascent

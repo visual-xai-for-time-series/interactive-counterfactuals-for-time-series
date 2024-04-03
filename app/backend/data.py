@@ -9,128 +9,6 @@ endings_to_find = ['pkl', 'pkl', 'pkl', 'pkl', 'pkl']
 
 base_path = '/data/'
 
-base = 'resnet-ecg5000'
-# base = 'resnet-forda'
-files = None
-
-directories_found = {}
-def get_directories(path):
-    global files
-    directories = [os.path.join(path, name) for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
-
-    for directory_to_search in directories:
-        directory_files = find_files(directory_to_search, substrings_to_find, endings_to_find)
-        directories_found[directory_to_search] = directory_files
-
-    print(f'Found:\n{directories_found}')
-    for k in directories_found:
-        if base in k:
-            files = directories_found[k]
-            break
-
-
-data_in_memory = {}
-def get_data_from_path(path, load_in_memory=True):
-    if path in data_in_memory:
-        return data_in_memory[path]
-    with open(path, 'rb') as f:
-        data = dill.load(f)
-    if load_in_memory:
-        data_in_memory[path] = data
-    return data
-
-
-def get_time_series_data(stage='train'):
-    path = files['data']
-    data = get_data_from_path(path)
-    tmp_data = [
-        data[stage][0],
-        data[stage][1],
-        argmax(data[stage][2]),
-        data[stage][2],
-    ]
-    return {'data': tmp_data}
-
-
-def get_activations_data(stage='train'):
-    path = files['activations']
-    data = get_data_from_path(path)
-    return {'data': data[stage]}
-
-
-def get_attributions_data(stage='train'):
-    path = files['attributions']
-    data = get_data_from_path(path)
-    return {'data': data[stage]}
-
-
-def get_projected_time_series_data(stage='train'):
-    path = files['mappers']
-    data = get_data_from_path(path)
-    return {'data': data['data'][stage][1]}
-
-
-def get_projected_activations_data(stage='train'):
-    path = files['mappers']
-    data = get_data_from_path(path)
-    return {'data': data['activations'][stage][1]}
-
-
-def get_projected_attributions_data(stage='train', attribution=None):
-    path = files['mappers']
-    data = get_data_from_path(path)
-    if attribution is None:
-        attribution = list(data['attributions'][stage].keys())[0]
-    return {'data': data['attributions'][stage][attribution][1]}
-
-
-density_color_dict = {}
-
-
-def get_projected_time_series_density_data(stage='train'):
-    path = files['density']
-    if f'{path}-data' not in density_color_dict:
-        data = get_data_from_path(path)
-        data = color_mixer(data['data'][stage])
-        density_color_dict[f'{path}-data'] = data
-    else:
-        data = density_color_dict[f'{path}-data']
-    return {'data': data}
-
-
-def get_projected_activations_density_data(stage='train'):
-    path = files['density']
-    if f'{path}-activations' not in density_color_dict:
-        data = get_data_from_path(path)
-        data = color_mixer(data['activations'][stage])
-        density_color_dict[f'{path}-activations'] = data
-    else:
-        data = density_color_dict[f'{path}-activations']
-    return {'data': data}
-
-
-def get_projected_attributions_density_data(stage='train', attribution=None):
-    path = files['density']
-    data = get_data_from_path(path)
-    if attribution is None:
-        attribution = list(data['attributions'][stage].keys())[0]
-    if f'{path}-attributions-{attribution}' not in density_color_dict:
-        data = color_mixer(data['attributions'][stage][attribution])
-        density_color_dict[f'{path}-attributions-{attribution}'] = data
-    else:
-        data = density_color_dict[f'{path}-attributions-{attribution}']
-    return {'data': data}
-
-
-def preload():
-    get_time_series_data()
-    get_activations_data()
-    get_attributions_data()
-
-    get_projected_time_series_data()
-
-    get_projected_time_series_density_data()
-
 
 def download_data(url, local_filename):
     if not os.path.exists(local_filename):
@@ -163,8 +41,176 @@ def download_all_files(path):
                 download_data(link[0], os.path.join(path, link[1]))
 
 
-download_all_files(base_path)
+class DataInMemory:
+    found_directories = {}
+    selected_files = {}
+    loaded_files = {}
+    loaded_color = {}
 
-get_directories('/data/')
+    selected_base = None
+    selected_stage = None
+
+
+    def __init__(self, path, base='resnet-ecg5000', stage='train'):
+        directories = [os.path.join(path, name) for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
+
+        for directory_to_search in directories:
+            directory_files = find_files(directory_to_search, substrings_to_find, endings_to_find)
+            directory_files = {k: v[0] for k, v in directory_files.items() if len(v) > 0}
+
+            self.found_directories[directory_to_search] = directory_files
+
+        print(f'Found: {list(self.found_directories.keys())}')
+
+        self.change_base(base)
+        self.change_stage(stage)
+
+
+    def __call__(self, base, load_in_memory=True):
+        path = self.selected_files[base]
+
+        data = self.__load_data(path, load_in_memory)
+        return data
+
+
+    def __load_data(self, path, load_in_memory=True):
+        if path in self.loaded_files:
+
+            data = self.loaded_files[path]
+
+        else:
+
+            with open(path, 'rb') as f:
+                data = dill.load(f)
+
+            if load_in_memory:
+                self.loaded_files[path] = data
+
+        if isinstance(data, dict) and self.selected_stage in data:
+            return data[self.selected_stage]
+        return data
+
+
+    def change_base(self, base='resnet-ecg5000'):
+        if base is None:
+            selection = [[k, v] for k, v in self.found_directories.items()][0]
+            self.selected_base, self.selected_files = selection
+        else:
+            selection = [[k, v] for k, v in self.found_directories.items() if base in k][0]
+            self.selected_base, self.selected_files = selection
+        print(f'Selected: {self.selected_base}')
+
+    
+    def change_stage(self, stage='train'):
+        self.selected_stage = stage
+        print(f'Selected: {self.selected_stage}')
+
+
+    def get_stages(self):
+        return list(self.selected_files['data'].keys())
+
+
+    def get_stage(self):
+        return self.selected_stage
+
+    
+    def get_density(self, base):
+        path = self.selected_files['density']
+        if f'{path}-{base}' not in self.loaded_color:
+            data = self.__load_data(path)
+            data = color_mixer(data[base][self.selected_stage])
+            self.loaded_color[f'{path}-{base}'] = data
+        else:
+            data = self.loaded_color[f'{path}-{base}']
+        return data
+
+
+    def get_density_multiple(self, base, attribution=None):
+        path = self.selected_files['density']
+        data = self.__load_data(path)
+        attributions = data[base][self.selected_stage]
+        if attribution is None:
+            attribution = list(attributions.keys())[0]
+        if f'{path}-{base}-{attribution}' not in self.loaded_color:
+            data = color_mixer(data[base][self.selected_stage][attribution])
+            self.loaded_color[f'{path}-{base}-{attribution}'] = data
+        else:
+            data = self.loaded_color[f'{path}-{base}-{attribution}']
+        return data
+
+
+download_all_files(base_path)
+data_in_memory = DataInMemory(base_path)
+
+
+def get_time_series_data():
+    data = data_in_memory('data')
+    tmp_data = [
+        data[0],
+        data[1],
+        argmax(data[2]),
+        data[2],
+    ]
+    return {'data': tmp_data}
+
+
+def get_activations_data():
+    data = data_in_memory('activations')
+    return {'data': data}
+
+
+def get_attributions_data():
+    data = data_in_memory('attributions')
+    return {'data': data}
+
+
+def get_projected_time_series_data():
+    data = data_in_memory('mappers')
+    stage = data_in_memory.get_stage()
+    _, mapped_data = data['data'][stage]
+    return {'data': mapped_data}
+
+
+def get_projected_activations_data():
+    data = data_in_memory('mappers')
+    stage = data_in_memory.get_stage()
+    _, mapped_data = data['activations'][stage]
+    return {'data': mapped_data}
+
+
+def get_projected_attributions_data(attribution=None):
+    data = data_in_memory('mappers')
+    stage = data_in_memory.get_stage()
+    mapped_attributions = data['attributions'][stage]
+    if attribution is None:
+        attribution = list(mapped_attributions.keys())[0]
+    _, mapped_data = mapped_attributions[attribution]
+    return {'data': mapped_data}
+
+
+def get_projected_time_series_density_data():
+    data = data_in_memory.get_density('data')
+    return {'data': data}
+
+
+def get_projected_activations_density_data():
+    data = data_in_memory.get_density('activations')
+    return {'data': data}
+
+
+def get_projected_attributions_density_data(attribution=None):
+    data = data_in_memory.get_density_multiple('attributions', attribution)
+    return {'data': data}
+
+
+def preload():
+    get_time_series_data()
+    get_activations_data()
+    get_attributions_data()
+
+    get_projected_time_series_data()
+
+    get_projected_time_series_density_data()
+
 
 preload()

@@ -1,7 +1,13 @@
 import os
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+
+from captum.attr import Saliency, InputXGradient, IntegratedGradients, GuidedBackprop
+from captum.attr import DeepLift, LRP
+from captum.attr import ShapleyValueSampling, GradientShap, DeepLiftShap
+from captum.attr import Occlusion, FeaturePermutation, Lime, KernelShap
 
 import numpy as np
 
@@ -12,7 +18,7 @@ color_scales = {
 
 def find_files(directory, substrings, endings):
     # Dictionary to store matching file paths
-    matching_files = {substring: None for substring in substrings}
+    matching_files = {substring: [] for substring in substrings}
 
     # Walk through the directory and its subdirectories
     for root, _, files in os.walk(directory):
@@ -22,9 +28,9 @@ def find_files(directory, substrings, endings):
             for substring, ending in zip(substrings, endings):
                 if filename.endswith(ending) and substring in filename:
                     # If the conditions are met, add the file path to the dictionary
-                    if matching_files[substring] is None:
-                        matching_files[substring] = os.path.join(root, filename)
-                        break  # Break the inner loop to prevent duplicates
+                    # if matching_files[substring] is None:
+                    matching_files[substring].append(os.path.join(root, filename))
+                    break  # Break the inner loop to prevent duplicates
 
     return matching_files
 
@@ -79,3 +85,45 @@ def color_mixer(data, color_map='Dark2'):
 
 def argmax(data, axis=1):
     return np.argmax(data, axis=axis)
+
+
+def name_to_class(name='DeepLift'):
+    if name == 'Saliency':
+        return Saliency
+    elif name == 'InputXGradient':
+        return InputXGradient
+    elif name == 'IntegratedGradients':
+        return IntegratedGradients
+    elif name == 'GuidedBackprop':
+        return GuidedBackprop
+    elif name == 'DeepLift':
+        return DeepLift
+    elif name == 'LRP':
+        return LRP
+    elif name == 'ShapleyValueSampling':
+        return ShapleyValueSampling
+    elif name == 'GradientShap':
+        return GradientShap
+    elif name == 'DeepLiftShap':
+        return DeepLiftShap
+    elif name == 'Occlusion':
+        return Occlusion
+    elif name == 'FeaturePermutation':
+        return FeaturePermutation
+    elif name == 'Lime':
+        return Lime
+    elif name == 'KernelShap':
+        return KernelShap
+    return None
+
+
+def get_last_layer(model):
+        possible_layers = []
+        for layer in model.children():
+            if isinstance(layer, (nn.Linear, nn.Conv1d, nn.Conv2d, nn.ConvTranspose2d)):
+                possible_layers.append(layer)
+            elif isinstance(layer, nn.Sequential):
+                possible_layers.extend(get_last_layer(layer))
+            elif isinstance(layer, nn.Module):
+                possible_layers.extend(get_last_layer(layer))
+        return possible_layers
