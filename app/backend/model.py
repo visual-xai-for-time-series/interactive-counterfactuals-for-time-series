@@ -55,7 +55,7 @@ class ModelsInMemory:
         print(f'Selected model: {self.selected_model}')
 
 
-    def get_possible_models():
+    def get_possible_models(self):
         return list(self.models_in_memory.keys())
 
 

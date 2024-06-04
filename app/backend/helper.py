@@ -11,9 +11,22 @@ from captum.attr import Occlusion, FeaturePermutation, Lime, KernelShap
 
 import numpy as np
 
+
+DEBUG = False
+
+
 color_scales = {
-    'Dark2': np.array([[0.10588235294117647, 0.6196078431372549, 0.4666666666666667], [0.8509803921568627, 0.37254901960784315, 0.00784313725490196], [0.4588235294117647, 0.4392156862745098, 0.7019607843137254], [0.9058823529411765, 0.1607843137254902, 0.5411764705882353], [0.4, 0.6509803921568628, 0.11764705882352941], [0.9019607843137255, 0.6705882352941176, 0.00784313725490196], [0.6509803921568628, 0.4627450980392157, 0.11372549019607843], [0.4, 0.4, 0.4]])
+    'Dark2': np.array([[0.10588235294117647, 0.6196078431372549, 0.4666666666666667], [0.8509803921568627, 0.37254901960784315, 0.00784313725490196], [0.4588235294117647, 0.4392156862745098, 0.7019607843137254], [0.9058823529411765, 0.1607843137254902, 0.5411764705882353], [0.4, 0.6509803921568628, 0.11764705882352941], [0.9019607843137255, 0.6705882352941176, 0.00784313725490196], [0.6509803921568628, 0.4627450980392157, 0.11372549019607843], [0.4, 0.4, 0.4]]),
+    'Accent': np.array([[0.49803922, 0.78823529, 0.49803922],
+       [0.74509804, 0.68235294, 0.83137255],
+       [0.99215686, 0.75294118, 0.5254902 ],
+       [1.        , 1.        , 0.6       ],
+       [0.21960784, 0.42352941, 0.69019608],
+       [0.94117647, 0.00784314, 0.49803922],
+       [0.74901961, 0.35686275, 0.08627451],
+       [0.4       , 0.4       , 0.4       ]])
 }
+default_color_scale = 'Dark2'
 
 
 def find_files(directory, substrings, endings):
@@ -58,12 +71,12 @@ def moving_average_torch(data, window_size):
     return smoothed_data.flatten()
 
 
-def color_mixer(data, color_map='Dark2'):
+def color_mixer(data, color_map=default_color_scale):
     coordinate_data, prediction_data = data
 
     # Check if at least one value exceeds 0.8 along the last axis
     max_value = np.max(prediction_data, axis=-1)
-    indices_to_set = np.where(max_value > 0.75)
+    indices_to_set = np.where(max_value > 0.8)
 
     # Set values to 1.0 where the condition is met, otherwise keep them unchanged
     for i in indices_to_set[0]:
@@ -77,10 +90,10 @@ def color_mixer(data, color_map='Dark2'):
     color_data = np.full((shape[0], 3), 0)
     for i in range(shape[0]):
         col = prediction_data[i, :]
-        color = np.sum([np.array(cmap[i]) * c for i, c in enumerate(col)], axis=0)
+        color = np.sum([np.array(cmap[j]) * c for j, c in enumerate(col)], axis=0)
         color_data[i, :] = (color * 255).astype(np.uint8)
 
-    return coordinate_data, color_data
+    return coordinate_data, color_data, prediction_data
 
 
 def argmax(data, axis=1):

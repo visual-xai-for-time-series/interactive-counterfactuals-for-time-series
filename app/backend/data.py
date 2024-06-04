@@ -21,7 +21,8 @@ def download_data(url, local_filename):
         
         print(f'Download finished: {local_filename}')
     else:
-        print(f'File already exists: {local_filename}')
+        if DEBUG:
+            print(f'File already exists: {local_filename}')
 
 
 def download_all_files(path):
@@ -51,6 +52,7 @@ class DataInMemory:
     selected_stage = None
 
 
+    # resnet-ecg5000 resnet-wafer
     def __init__(self, path, base='resnet-ecg5000', stage='train'):
         directories = [os.path.join(path, name) for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
 
@@ -60,7 +62,7 @@ class DataInMemory:
 
             self.found_directories[directory_to_search] = directory_files
 
-        print(f'Found: {list(self.found_directories.keys())}')
+        print(f'Found data: {list(self.found_directories.keys())}')
 
         self.change_base(base)
         self.change_stage(stage)
@@ -68,52 +70,56 @@ class DataInMemory:
 
     def __call__(self, base, load_in_memory=True):
         path = self.selected_files[base]
-
         data = self.__load_data(path, load_in_memory)
         return data
 
 
     def __load_data(self, path, load_in_memory=True):
         if path in self.loaded_files:
-
             data = self.loaded_files[path]
-
         else:
-
-            with open(path, 'rb') as f:
-                data = dill.load(f)
+            try:
+                with open(path, 'rb') as f:
+                    data = dill.load(f)
+            except Exception as e:
+                print(f'Error with {path}')
+                print(str(e))
 
             if load_in_memory:
                 self.loaded_files[path] = data
-
         if isinstance(data, dict) and self.selected_stage in data:
             return data[self.selected_stage]
         return data
 
 
-    def change_base(self, base='resnet-ecg5000'):
+    def change_base(self, base):
         if base is None:
             selection = [[k, v] for k, v in self.found_directories.items()][0]
             self.selected_base, self.selected_files = selection
         else:
             selection = [[k, v] for k, v in self.found_directories.items() if base in k][0]
             self.selected_base, self.selected_files = selection
-        print(f'Selected: {self.selected_base}')
+        print(f'Selected data: {self.selected_base}')
 
     
     def change_stage(self, stage='train'):
         self.selected_stage = stage
-        print(f'Selected: {self.selected_stage}')
+        print(f'Selected stage: {self.selected_stage}')
 
 
     def get_stages(self):
-        return list(self.selected_files['data'].keys())
+        stages = []
+        path = self.selected_files['activations']
+        if path in self.loaded_files:
+            data = self.loaded_files[path]
+            stages = list(data.keys())
+        return stages
 
 
     def get_stage(self):
         return self.selected_stage
 
-    
+
     def get_density(self, base):
         path = self.selected_files['density']
         if f'{path}-{base}' not in self.loaded_color:
@@ -190,17 +196,20 @@ def get_projected_attributions_data(attribution=None):
 
 def get_projected_time_series_density_data():
     data = data_in_memory.get_density('data')
-    return {'data': data}
+    coordinate_data, color_data, prediction_data = data
+    return {'data': [coordinate_data, color_data], 'predictions': prediction_data}
 
 
 def get_projected_activations_density_data():
     data = data_in_memory.get_density('activations')
-    return {'data': data}
+    coordinate_data, color_data, prediction_data = data
+    return {'data': [coordinate_data, color_data], 'predictions': prediction_data}
 
 
 def get_projected_attributions_density_data(attribution=None):
     data = data_in_memory.get_density_multiple('attributions', attribution)
-    return {'data': data}
+    coordinate_data, color_data, prediction_data = data
+    return {'data': [coordinate_data, color_data], 'predictions': prediction_data}
 
 
 def preload():

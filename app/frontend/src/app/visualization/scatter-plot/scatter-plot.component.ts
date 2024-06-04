@@ -114,6 +114,10 @@ export class ScatterPlotComponent implements AfterViewInit {
 
     private createSVG(): void {
         console.log('Initalize SVG')
+
+        const colorScale = this.dataService.getColorScale()
+        console.log(colorScale)
+
         this.mainDiv = d3.select(this.div_element?.nativeElement)
 
         this.containerWidth = this.div_element?.nativeElement.clientWidth ?? 600
@@ -143,7 +147,9 @@ export class ScatterPlotComponent implements AfterViewInit {
 
         const labels = this.prediction_probabilities[0].length
 
-        this.svg
+        const markerGroup = this.svg.append('g').attr('id', 'arrowHEADS')
+
+        markerGroup
             .append('defs')
             .append('marker')
             .attr('id', 'arrow')
@@ -159,7 +165,7 @@ export class ScatterPlotComponent implements AfterViewInit {
             .style('fill', 'gray')
 
         Array.from({ length: labels }, (_, index) => index).forEach((value) => {
-            this.svg
+            markerGroup
                 .append('defs')
                 .append('marker')
                 .attr('id', `arrow-${value}`)
@@ -172,7 +178,7 @@ export class ScatterPlotComponent implements AfterViewInit {
                 .append('path')
                 .attr('d', 'M0,-5L10,0L0,5')
                 .attr('class', 'arrowHead')
-                .style('fill', d3.schemeDark2[value])
+                .style('fill', `rgb(${colorScale[value]})`)
         })
     }
 
@@ -197,13 +203,15 @@ export class ScatterPlotComponent implements AfterViewInit {
 
         if (ctx) {
             coordinate_data.forEach((d, i) => {
-                ctx.fillStyle = `rgb(${color_data[i]}, 0.5)`
+                ctx.fillStyle = `rgb(${color_data[i]}, 0.6)`
                 ctx.fillRect(this.xScale(d[0]), this.yScale(d[1]), ratio_width, ratio_height)
             })
         }
     }
 
     private drawScatterPlot(data: any[]): void {
+        const colorScale = this.dataService.getColorScale()
+
         this.xScale = d3
             .scaleLinear()
             .domain(d3.extent(data, (d) => d[0]))
@@ -226,12 +234,14 @@ export class ScatterPlotComponent implements AfterViewInit {
             .attr('cx', (d: any) => this.xScale(d[0]))
             .attr('cy', (d: any) => this.yScale(d[1]))
             .attr('r', this.radius)
-            .attr('fill', (_, i: number) => d3.schemeDark2[this.color[i]])
+            .attr('fill', (_, i: number) => `rgb(${colorScale[this.color[i]]}, 0.99)`)
 
         this.pointInteractionHandler()
     }
 
     private pointInteractionHandler(): void {
+        const colorScale = this.dataService.getColorScale()
+
         let wasDragged = false
         const that = this
 
@@ -310,7 +320,7 @@ export class ScatterPlotComponent implements AfterViewInit {
                         const prediction = parseInt(data['prediction'][0])
                         const orgColor = orgPoint.attr('fill')
                         orgPoint.attr('org-fill', orgPoint.attr('fill'))
-                        const newColor = d3.schemeDark2[prediction]
+                        const newColor = `rgb(${colorScale[prediction]}, 1.0)`
                         orgPoint.attr('fill', newColor).raise()
 
                         // Set the gradient
@@ -611,7 +621,8 @@ export class ScatterPlotComponent implements AfterViewInit {
             this.color = this.predictions
         }
         if (this.svg) {
-            this.svg.selectAll('.data-point').attr('fill', (_, i: number) => d3.schemeDark2[this.color[i]])
+            const colorScale = this.dataService.getColorScale()
+            this.svg.selectAll('.data-point').attr('fill', (_, i: number) => `rgb(${colorScale[this.color[i]]}, 0.8)`)
         }
     }
 
@@ -652,6 +663,8 @@ export class ScatterPlotComponent implements AfterViewInit {
 
             densityObservable.subscribe((data: any) => {
                 const receivedData = JSON.parse(data)
+                console.log(receivedData)
+
                 this.dataDensity = receivedData['data']
                 this.drawDensityPlot(receivedData['data'])
 

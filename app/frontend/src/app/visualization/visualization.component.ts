@@ -14,6 +14,7 @@ import { LinePlotsComponent } from './line-plots/line-plots.component'
 
 import { InteractionsService } from './interactions.service'
 import { HttpService } from './http.service'
+import { DataService } from './data.service'
 
 import { environment } from '../../environments/environment'
 
@@ -65,21 +66,34 @@ export class VisualizationComponent implements OnInit {
         this.baseUrl + '/api/inverse_project_attributions/?stage=' + this.stage,
     ]
 
+    public colorScales = this.baseUrl + '/api/get_color_scale'
+
     public originalTimeSeries = this.baseUrl + '/api/get_time_series/?stage=' + this.stage
     public firstDataLoaded = false
 
-    constructor(private httpService: HttpService, private interactionsService: InteractionsService) {}
+    constructor(
+        private httpService: HttpService,
+        private interactionsService: InteractionsService,
+        private dataService: DataService
+    ) {}
 
     ngOnInit(): void {
         console.log(this.baseUrl)
         this.firstDataLoaded = false
 
-        this.httpService.get<any>(this.originalTimeSeries).subscribe((data: any) => {
+        this.httpService.get<any>(this.colorScales).subscribe((data: any) => {
             const parsed_data = JSON.parse(data)
-            this.interactionsService.setData(parsed_data['data'])
+            this.dataService.setColorScale(parsed_data['color'])
 
-            this.firstDataLoaded = true
-            console.log('Data Loaded')
+            console.log('Color Scale Loaded')
+
+            this.httpService.get<any>(this.originalTimeSeries).subscribe((data: any) => {
+                const parsed_data = JSON.parse(data)
+                this.interactionsService.setData(parsed_data['data'])
+
+                this.firstDataLoaded = true
+                console.log('Data Loaded')
+            })
         })
 
         this.httpService.isRequestPending().subscribe((pending: boolean) => {

@@ -1,5 +1,3 @@
-version: '3'
-
 name: icfts
 services:
     preprocess:
@@ -24,8 +22,10 @@ services:
         ports:
             - 4200:4200
         depends_on:
-            preprocess:
-                condition: service_completed_successfully
+            # preprocess:
+            #     condition: service_completed_successfully
+            backend:
+                condition: service_healthy
 
     backend:
         build:
@@ -37,9 +37,14 @@ services:
             - '${DATA_PATH}:/data/'
         ports:
             - 8000:8000
+        healthcheck:
+            test: ['CMD', 'curl', '-f', 'http://localhost:8000/']
+            interval: 90s
+            timeout: 10s
+            retries: 3
         environment:
             PYTHONUNBUFFERED: 1
-        depends_on:
-            preprocess:
-                condition: service_completed_successfully
+        # depends_on:
+        #     preprocess:
+        #         condition: service_completed_successfully
 

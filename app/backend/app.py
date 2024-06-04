@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from model import *
 from data import *
 from projections import *
+from helper import *
 
 
 origins = [
@@ -157,6 +158,14 @@ async def inverse_project_attributions(request_body: dict = Body()):
         return 'Error wrong format'
 
 
+@app.get('/api/get_color_scale/')
+async def get_color_scale(scale: str = 'default'):
+    color = color_scales[default_color_scale]
+    if scale in color_scales:
+        color = color_scales[scale]
+    return create_json_response({'color': color * 255})
+
+
 @app.get('/api/get_stages/')
 async def get_stages():
     return {'data': data_in_memory.get_stages()}
@@ -178,7 +187,6 @@ async def set_model(model: str = 'resnet-ecg5000'):
     models_in_memory.change_model(model)
     data_in_memory.change_base(model)
     return 200
-
 
 
 @app.get('/')

@@ -5,6 +5,7 @@ import { Injectable } from '@angular/core'
 })
 export class DataService {
     private counter: number = 0
+    private colorScale: any[] = []
 
     constructor() {}
 
@@ -14,5 +15,13 @@ export class DataService {
 
     addToCounter(add: number = 1): void {
         this.counter += add
+    }
+
+    setColorScale(newColorScale: any[]): void {
+        this.colorScale = newColorScale
+    }
+
+    getColorScale(): any[] {
+        return this.colorScale
     }
 }

@@ -4,6 +4,7 @@ import os
 import sys
 import dill
 import time
+import shutil
 import random
 import argparse
 
@@ -22,11 +23,16 @@ import torch.nn as nn
 
 from torch.utils.data import Dataset, DataLoader
 
-from captum.attr import GradientShap, IntegratedGradients, ShapleyValueSampling, Saliency, DeepLift, DeepLiftShap
+from captum.attr import Saliency, InputXGradient, IntegratedGradients, GradientShap
+from captum.attr import ShapleyValueSampling, DeepLift, DeepLiftShap
 
 from sklearn.preprocessing import OneHotEncoder
 
 from sktime.datasets import load_UCR_UEA_dataset
+
+from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor
+
 
 random_seed = 13
 
@@ -67,6 +73,22 @@ class NumpyArrayEncoder(JSONEncoder):
         return JSONEncoder.default(self, o)
 
 
+def inverse_transform_chunk(model, low_dim_data):
+    return model.inverse_transform(low_dim_data)
+
+
+def parallel_inverse_transform(model, reduced_data, num_processes=4):
+    # Calculate the size of each chunk of data
+    chunk_size = len(reduced_data) // num_processes
+    data_chunks = [reduced_data[i * chunk_size:(i + 1) * chunk_size] for i in range(num_processes)]
+    
+    # Using ProcessPoolExecutor to parallelize tasks
+    with ProcessPoolExecutor(max_workers=num_processes) as executor:
+        futures = [executor.submit(inverse_transform_chunk, model, chunk) for chunk in data_chunks]
+        results = [future.result() for future in futures]
+    return np.vstack(results)
+
+
 def main():
     overall_time = time.process_time()
 
@@ -80,6 +102,8 @@ def main():
                         help='Specify the model type (choose from: cnn, resnet)')
     parser.add_argument('--base_path', '-p', type=str, default='/data/', 
                         help='Path to save/load the model (default: data/)')
+    parser.add_argument('---create-new', '-cn', type=str, default='0', 
+                        help='Create a new file even if an old exists in /new/ (default: 0)')
 
     print('Setting the stage')
 
@@ -89,6 +113,9 @@ def main():
     dataset = args.dataset
     model_type = args.model
     base_data_path = args.base_path
+    create_new = args.create_new
+
+    print(f'for {dataset}')
 
     ######## Set directories
 
@@ -98,6 +125,11 @@ def main():
     model_path = os.path.join(base_data_path, model_file)
 
     extracted_data_path = os.path.join(base_data_path, f'{model_base_name}-extracted')
+    if bool(create_new):
+        print('Create new')
+        extracted_data_path = os.path.join(extracted_data_path, 'new')
+        if os.path.exists(extracted_data_path) and os.path.isdir(extracted_data_path):
+            shutil.rmtree(extracted_data_path)
 
     os.makedirs(base_data_path, exist_ok=True)
     os.makedirs(extracted_data_path, exist_ok=True)
@@ -256,7 +288,7 @@ def main():
         # ['LRP', LRP],
         # ['Saliency', Saliency, {}],
         # ['InputXGradient', InputXGradient, {}],
-        # ['DeepLift', DeepLift, {}],
+        ['DeepLift', DeepLift, {}],
         ['DeepLiftShap', DeepLiftShap, {'baselines': baselines}],
         # ['IntegratedGradients', IntegratedGradients, {}],
         # ['GradientShap', GradientShap, {'baselines': baselines}],
@@ -417,7 +449,7 @@ def main():
         }
 
 
-        def create_decision_border_dense_map_for_data(data, mapper, projected_data=None):
+        def create_decision_border_dense_map_for_data(data, mapper, projected_data=None, sample_nr=250):
             # Generate augmented data using mapper
             if projected_data is None:
                 projected_data = mapper.transform(data)
@@ -426,12 +458,12 @@ def main():
             projected_data_pad = (projected_data_max - projected_data_min) * 0.05
             projected_data_max += projected_data_pad
             projected_data_min -= projected_data_pad
-            # sample_nr = 250
-            sample_nr = 100
             dim_x = np.linspace(projected_data_min[0], projected_data_max[0], sample_nr)
             dim_y = np.linspace(projected_data_min[1], projected_data_max[1], sample_nr)
             grid_search = np.array(np.meshgrid(dim_x, dim_y)).T.reshape(-1, 2)
-            inverse_augmented_data = mapper.inverse_transform(grid_search)
+
+            inverse_augmented_data = parallel_inverse_transform(mapper, grid_search, num_processes=10)
+
             return grid_search, inverse_augmented_data
 
 

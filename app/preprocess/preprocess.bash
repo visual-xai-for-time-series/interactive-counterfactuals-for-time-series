@@ -2,7 +2,8 @@
 
 # Basic settings for the model
 models=("resnet") # "cnn"
-datasets=("ECG5000" "FordA") # "FordB"
+datasets=("ECG5000" "FordA" "Wafer") # "FordB"
+new=1
 
 # Base path for the processed data
 path="/data/"
@@ -29,7 +30,7 @@ for model in "${models[@]}"; do
         fi
 
         # Extract data from the model
-        python extract_data.py -d "$dataset" -m "$model" -p "$path"
+        python extract_data.py -d "$dataset" -m "$model" -p "$path" -cn "$new"
 
         # Fix permissions to standard user
         if [ ! -z "$HOST_UID" ] && [ ! -z "$HOST_GID" ]; then

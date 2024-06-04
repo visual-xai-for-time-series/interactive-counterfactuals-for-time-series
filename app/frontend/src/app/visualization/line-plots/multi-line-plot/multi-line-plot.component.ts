@@ -6,6 +6,7 @@ import { MatDividerModule } from '@angular/material/divider'
 import { MatButtonModule } from '@angular/material/button'
 
 import * as d3 from 'd3'
+import { DataService } from '../../data.service'
 
 @Component({
     selector: 'app-multi-line-plot',
@@ -31,7 +32,7 @@ export class MultiLinePlotComponent {
 
     private renderedInstances: string[] = []
 
-    constructor(private interactionsService: InteractionsService) {}
+    constructor(private interactionsService: InteractionsService, private dataService: DataService) {}
 
     ngAfterViewInit(): void {
         if (typeof this.svg === 'undefined') {
@@ -110,6 +111,8 @@ export class MultiLinePlotComponent {
     private addLine(data_with_labels: any[]): void {
         console.log(data_with_labels)
 
+        const colorScale = this.dataService.getColorScale()
+
         const idx = data_with_labels[0]
         const data = data_with_labels[1]
         const label = data_with_labels[2]
@@ -122,9 +125,9 @@ export class MultiLinePlotComponent {
                 .attr('class', 'data-line')
                 .attr('data-idx', idx)
                 .attr('fill', 'none')
-                .attr('stroke', d3.schemeDark2[prediction])
+                .attr('stroke', `rgb(${colorScale[prediction]}, 1.0)`)
                 .attr('stroke-width', this.line_stroke_width)
-                .attr('base-stroke', d3.schemeDark2[prediction])
+                .attr('base-stroke', `rgb(${colorScale[prediction]}, 1.0)`)
                 .attr('d', this.line)
                 .on('mouseover', (d: any) => {
                     const idx = d3.select(d.target).attr('data-idx')
