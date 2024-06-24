@@ -109,6 +109,8 @@ def predict_and_get_attributions_from_model(data, attribution=None, baseline_sam
     shape = list(data.shape)
     data.requires_grad_(True)
 
+    print(shape)
+
     predictions = torch.argmax(model(data), axis=1)
 
     attribution_data = get_attributions_data()['data']
@@ -120,8 +122,10 @@ def predict_and_get_attributions_from_model(data, attribution=None, baseline_sam
     random_samples = np.random.randint(0, shape[0], size=baseline_samples)
     baselines = torch.from_numpy(dataset[random_samples]).reshape(-1, *shape[1:]).float().to(device)
 
+    print(baselines.shape)
+
     attribution_technqiue_called = attribution_technqiue(model)
-    attributions = attribution_technqiue_called.attribute(data, target=predictions, baselines=baselines)
+    attributions = attribution_technqiue_called.attribute(data, target=predictions) # , baselines=baselines
     attributions = attributions.detach().cpu().reshape(1, -1).numpy()
 
     predictions = predictions.detach().cpu().numpy().tolist()
@@ -278,7 +282,7 @@ def generate_time_series_from_attribution(data, attribution=None, baseline_sampl
         predictions = model(ts_candidate.reshape(1, 1, -1))
         predictions = torch.argmax(predictions, axis=1)
 
-        cur_attribution = attribution_tech.attribute(ts_candidate.reshape(1, 1, -1), target=predictions, baselines=baselines)
+        cur_attribution = attribution_tech.attribute(ts_candidate.reshape(1, 1, -1), target=predictions) # , baselines=baselines)
 
         loss = criterion(cur_attribution, data)
         # print(f'loss: {loss}')

@@ -1,5 +1,5 @@
 # Use the official Node.js version 21 image as the base image
-FROM node:21
+FROM node:22
 
 # Create a directory named 'app' in the container filesystem
 RUN mkdir /app
