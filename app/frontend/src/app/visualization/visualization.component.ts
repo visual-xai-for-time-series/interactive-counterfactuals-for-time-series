@@ -66,7 +66,7 @@ export class VisualizationComponent implements OnInit {
         this.baseUrl + '/api/inverse_project_attributions/?stage=' + this.stage,
     ]
 
-    public colorScales = this.baseUrl + '/api/get_color_scale'
+    public colorScales = this.baseUrl + '/api/get_color_scale/'
 
     public originalTimeSeries = this.baseUrl + '/api/get_time_series/?stage=' + this.stage
     public firstDataLoaded = false
