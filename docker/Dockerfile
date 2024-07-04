@@ -1,5 +1,5 @@
 # builder
-FROM node:21 as build-step
+FROM node:22 as build-step
 
 RUN mkdir /app
 WORKDIR /app
