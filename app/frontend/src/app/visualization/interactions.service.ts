@@ -17,6 +17,9 @@ export class InteractionsService {
     private colorMode = new BehaviorSubject(2)
     getColorMode = this.colorMode.asObservable()
 
+    private reloadData = new BehaviorSubject('')
+    getReloadData = this.reloadData.asObservable()
+
     private data
 
     constructor() {}
@@ -27,6 +30,10 @@ export class InteractionsService {
 
     setHighlightData(data: any): void {
         this.highlightData.next(data)
+    }
+
+    setReloadData(baseModel: string): void {
+        this.reloadData.next(baseModel)
     }
 
     addLineData(idx: any): void {

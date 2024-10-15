@@ -1,10 +1,12 @@
+import time
+
 import dill
 import urllib
 
 from helper import *
 
 
-substrings_to_find = ['data', 'activations', 'attributions', 'mappers', 'density']
+substrings_to_find = ['data', 'activations', 'attributions', 'mappers', 'density', 'combined']
 endings_to_find = ['pkl', 'pkl', 'pkl', 'pkl', 'pkl']
 
 base_path = '/data/'
@@ -35,11 +37,19 @@ def download_all_files(path):
         ('https://data.time-series-xai.dbvis.de/icfts/resnet-ecg5000-extracted/resnet-ecg5000-mappers.pkl', 'resnet-ecg5000-extracted/resnet-ecg5000-mappers.pkl'),
     ]
 
-    files = [resnet_ecg5000]
-    for file in files:
-        if isinstance(file, list):
-            for link in file:
-                download_data(link[0], os.path.join(path, link[1]))
+    try:
+        files = [resnet_ecg5000]
+        for file in files:
+            if isinstance(file, list):
+                for link in file:
+                    download_data(link[0], os.path.join(path, link[1]))
+        
+        return True
+    
+    except Exception as e:
+
+        print(f'Function failed with error: {e}')
+        return False
 
 
 class DataInMemory:
@@ -53,19 +63,20 @@ class DataInMemory:
 
 
     # resnet-ecg5000 resnet-wafer
-    def __init__(self, path, base='resnet-ecg5000', stage='train'):
-        directories = [os.path.join(path, name) for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
+    def __init__(self, path=None, base='resnet-ecg5000', stage='train'):
+        if path:
+            directories = [os.path.join(path, name) for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
 
-        for directory_to_search in directories:
-            directory_files = find_files(directory_to_search, substrings_to_find, endings_to_find)
-            directory_files = {k: v[0] for k, v in directory_files.items() if len(v) > 0}
+            for directory_to_search in directories:
+                directory_files = find_files(directory_to_search, substrings_to_find, endings_to_find)
+                directory_files = {k: v[0] for k, v in directory_files.items() if len(v) > 0}
 
-            self.found_directories[directory_to_search] = directory_files
+                self.found_directories[directory_to_search] = directory_files
 
-        print(f'Found data: {list(self.found_directories.keys())}')
+            print(f'Found data: {list(self.found_directories.keys())}')
 
-        self.change_base(base)
-        self.change_stage(stage)
+            self.change_base(base)
+            self.change_stage(stage)
 
 
     def __call__(self, base, load_in_memory=True):
@@ -145,8 +156,7 @@ class DataInMemory:
         return data
 
 
-download_all_files(base_path)
-data_in_memory = DataInMemory(base_path)
+data_in_memory = DataInMemory()
 
 
 def get_time_series_data():
@@ -213,13 +223,25 @@ def get_projected_attributions_density_data(attribution=None):
 
 
 def preload():
-    get_time_series_data()
-    get_activations_data()
-    get_attributions_data()
+    global data_in_memory
 
-    get_projected_time_series_data()
+    while True:
+        if download_all_files(base_path):
+        
+            data_in_memory = DataInMemory(base_path)
 
-    get_projected_time_series_density_data()
+            get_time_series_data()
+            get_activations_data()
+            get_attributions_data()
+
+            get_projected_time_series_data()
+
+            get_projected_time_series_density_data()
+
+            break
+
+        else:
+            time.sleep(600)
 
 
 preload()

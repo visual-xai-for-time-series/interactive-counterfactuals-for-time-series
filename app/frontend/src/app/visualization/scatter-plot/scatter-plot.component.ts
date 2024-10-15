@@ -51,7 +51,7 @@ export class ScatterPlotComponent implements AfterViewInit {
     private containerWidth
     private containerHeight
 
-    private margin = { top: 10, right: 10, bottom: 10, left: 10 }
+    private margin = { top: 10, right: 20, bottom: 10, left: 20 }
 
     private minDrag = { x: 15, y: 15 }
     private minClick = { x: 1, y: 1 }

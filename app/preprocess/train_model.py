@@ -124,6 +124,7 @@ def main():
     y_test_norm = y_test_ohe.argmax(axis=-1)
 
     labels_nr = len(encoder.categories_[0])
+    data_dim = X_train.shape[-1]
 
     dataset_train = TimeSeriesDataset(X_train, y_train_ohe)
     dataset_test = TimeSeriesDataset(X_test, y_test_ohe)
@@ -132,7 +133,7 @@ def main():
     dataloader_train_not_shuffled = DataLoader(dataset_train, batch_size=120, shuffle=False)
     dataloader_test = DataLoader(dataset_test, batch_size=120, shuffle=False)
 
-    model = SimpleCNN(labels_nr).to(device)
+    model = SimpleCNN(data_dim, labels_nr).to(device)
     if model_type == 'resnet':
         model = ResNet(labels_nr).to(device)
 

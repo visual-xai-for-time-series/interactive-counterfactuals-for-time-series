@@ -56,7 +56,7 @@ class ModelsInMemory:
 
 
     def get_possible_models(self):
-        return list(self.models_in_memory.keys())
+        return [x.rsplit('/', 1)[-1] for x in self.models_in_memory.keys()]
 
 
 models_in_memory = ModelsInMemory()

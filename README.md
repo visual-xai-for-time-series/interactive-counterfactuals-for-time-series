@@ -1,6 +1,6 @@
 # Interactive Counterfactual Generation for Univariate Time Series
 
-This repository hosts the official implementation of the "Interactive Counterfactual Generation for Univariate Time Series" application, as presented in our paper for the EuroVis Workshop on Visual Analytics 2024.
+This repository hosts the official implementation of the "Interactive Counterfactual Generation for Univariate Time Series" application, as presented in our paper for the Workshop on eXplainable Knowledge Discovery in Data Mining (XKDD) 2024.
 Our work introduces an interactive visual analytics application for generating counterfactual explanations in univariate time series data, aimed at enhancing the interpretability of deep learning models.
 
 Demo: https://icfts.time-series-xai.dbvis.de/
@@ -66,8 +66,8 @@ If you find this application useful for your research, please consider citing ou
 ```bibtex
 @inproceedings{interactive-counterfactual-generation,
   title={Interactive Counterfactual Generation for Univariate Time Series},
-  author={Schlegel, Udo and Keim, Daniel A.},
-  booktitle={EuroVis Workshop on Visual Analytics},
+  author={Schlegel, Udo and Rauscher, Julius and Keim, Daniel A.},
+  booktitle={Workshop on eXplainable Knowledge Discovery in Data Mining (XKDD)},
   year={2024}
 }
 ```

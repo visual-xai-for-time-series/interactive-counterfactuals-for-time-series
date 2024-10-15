@@ -19,7 +19,7 @@ export class AppComponent implements OnInit {
     constructor(public dialog: MatDialog) {}
 
     ngOnInit() {
-        // this.openOptionsModal()
+        this.openOptionsModal()
     }
 
     openOptionsModal(): void {

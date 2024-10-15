@@ -39,7 +39,7 @@ services:
             - 8000:8000
         healthcheck:
             test: ['CMD', 'curl', '-f', 'http://localhost:8000/']
-            interval: 90s
+            interval: 300s
             timeout: 10s
             retries: 3
         environment:

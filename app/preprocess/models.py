@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -80,7 +82,7 @@ class ResNet(nn.Module):
 
 
 class SimpleCNN(nn.Module):
-    def __init__(self, num_pred_classes=2):
+    def __init__(self, input_dim=500, num_pred_classes=2):
         super().__init__()
         
         self.conv1 = nn.Sequential(
@@ -97,9 +99,14 @@ class SimpleCNN(nn.Module):
             nn.MaxPool1d(3),
             nn.ReLU(inplace=True)
         )
+
+        def conv_len(i, k, s):
+            return math.floor((i - (k - 1) - 1) / s + 1)
+
+        conv_to_fc = conv_len(conv_len(conv_len(conv_len(conv_len(input_dim, 3, 1), 3, 1), 3, 3), 3, 1), 3, 3)
         
         self.fc1 = nn.Sequential(
-            nn.Linear(100 * 54, 100),
+            nn.Linear(100 * conv_to_fc, 100),
             nn.Dropout(0.5),
             nn.ReLU(inplace=True)
         )

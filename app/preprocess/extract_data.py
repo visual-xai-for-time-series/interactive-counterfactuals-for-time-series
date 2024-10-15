@@ -16,6 +16,8 @@ import umap
 import json
 from json import JSONEncoder
 
+from datetime import datetime
+
 from tqdm import tqdm
 
 import torch
@@ -33,6 +35,8 @@ from sktime.datasets import load_UCR_UEA_dataset
 from multiprocessing import Pool
 from concurrent.futures import ProcessPoolExecutor
 
+from logger import logger
+
 
 random_seed = 13
 
@@ -42,8 +46,14 @@ np.random.seed(random_seed)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+
+logger.info('')
+logger.info(f'Found: {device}')
+logger.info('')
+
+
 from models import *
-from helper import *
+from helpers import *
 
 
 class TimeSeriesDataset(Dataset):
@@ -102,10 +112,8 @@ def main():
                         help='Specify the model type (choose from: cnn, resnet)')
     parser.add_argument('--base_path', '-p', type=str, default='/data/', 
                         help='Path to save/load the model (default: data/)')
-    parser.add_argument('---create-new', '-cn', type=str, default='0', 
-                        help='Create a new file even if an old exists in /new/ (default: 0)')
-
-    print('Setting the stage')
+    parser.add_argument('---create-new', '-cn', type=str, default='False', 
+                        help='Create a new file even if an old exists in /new/ (default: False)')
 
     # Parse the arguments
     args = parser.parse_args()
@@ -114,8 +122,12 @@ def main():
     model_type = args.model
     base_data_path = args.base_path
     create_new = args.create_new
+    if create_new == 'False':
+        create_new = False
+    else:
+        create_new = True
 
-    print(f'for {dataset}')
+    logger.info(f'Setting the stage: {dataset} and create new: {create_new}')
 
     ######## Set directories
 
@@ -125,8 +137,8 @@ def main():
     model_path = os.path.join(base_data_path, model_file)
 
     extracted_data_path = os.path.join(base_data_path, f'{model_base_name}-extracted')
-    if bool(create_new):
-        print('Create new')
+    if create_new:
+        logger.info('Create new directory')
         extracted_data_path = os.path.join(extracted_data_path, 'new')
         if os.path.exists(extracted_data_path) and os.path.isdir(extracted_data_path):
             shutil.rmtree(extracted_data_path)
@@ -136,12 +148,12 @@ def main():
 
     ######## Get the data
 
-    print('Getting the data')
+    logger.info('Getting the data')
 
     X_train, y_train = load_UCR_UEA_dataset(name=dataset, split='train', return_type='numpyflat')
     X_test, y_test = load_UCR_UEA_dataset(name=dataset, split='test', return_type='numpyflat')
 
-    print(f'Length training data: {len(X_train)} labels: {len(y_train)} test data: {len(X_test)} labels: {len(y_test)}')
+    logger.info(f'Length training data: {len(X_train)} labels: {len(y_train)} test data: {len(X_test)} labels: {len(y_test)}')
 
     encoder = OneHotEncoder(categories='auto', sparse_output=False)
 
@@ -162,7 +174,7 @@ def main():
 
     ######## Load model
 
-    print('Loading the model')
+    logger.info(f'Loading the model: {model_type} in {model_path}')
 
     model = torch.load(model_path, map_location=device)
     model.eval()
@@ -183,7 +195,8 @@ def main():
 
     preds = torch.stack(preds)
     labels = torch.stack(labels)
-    print('Prediction Accuracy Train', np.round((preds.argmax(dim=-1) == labels.argmax(dim=-1)).int().sum().float().item() / len(preds), 4))
+    pred_train_acc_ = np.round((preds.argmax(dim=-1) == labels.argmax(dim=-1)).int().sum().float().item() / len(preds), 4)
+    logger.info(f'Prediction Accuracy Train: {pred_train_acc_}')
 
     y_train_pred = preds.cpu().detach().numpy().round(3)
     
@@ -203,12 +216,18 @@ def main():
 
     preds = torch.stack(preds)
     labels = torch.stack(labels)
-    print('Prediction Accuracy Test', np.round((preds.argmax(dim=-1) == labels.argmax(dim=-1)).int().sum().float().item() / len(preds), 4))
+    pred_test_acc_ = np.round((preds.argmax(dim=-1) == labels.argmax(dim=-1)).int().sum().float().item() / len(preds), 4)
+    logger.info(f'Prediction Accuracy Test: {pred_test_acc_}')
 
     y_test_pred = preds.cpu().detach().numpy().round(3)
 
     data_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-data.pkl')
-    if not os.path.exists(data_path):
+    if os.path.exists(data_path):
+
+        with open(data_path, 'rb') as file:
+            data_to_save = dill.load(file)
+
+    else:
 
         data_to_save = {
             'train': (X_train, y_train_norm.astype(int), y_train_pred),
@@ -220,7 +239,7 @@ def main():
 
     ######## Get activations
 
-    print('Getting the activation')
+    logger.info('Getting the activation')
 
     def get_possible_layer(model):
         possible_layers = []
@@ -236,6 +255,7 @@ def main():
     layer_to_look_at = possible_layers_to_look_at[-2]
 
     activations_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-activations.pkl')
+    logger.info(f'Path for activation data: {activations_path}')
     if os.path.exists(activations_path):
         with open(activations_path, 'rb') as file:
             activations = dill.load(file)
@@ -243,7 +263,7 @@ def main():
         activations = {}
         model.eval()
 
-        print(f'Layer to look at the activations: {layer_to_look_at}')
+        logger.info(f'Layer to look at the activations: {layer_to_look_at}')
         activation_handle = layer_to_look_at.register_forward_hook(get_activations(activations, 'train'))
 
         for idx, (inputs, labels) in enumerate(dataloader_train_not_shuffled):
@@ -271,12 +291,12 @@ def main():
 
     activations_train = np.array(activations['train'])
     activations_test = np.array(activations['test'])
-    print(f'Length of train activations: {activations_train.shape}')
-    print(f'Length of test activations: {activations_test.shape}')
+    logger.info(f'Length of train activations: {activations_train.shape}')
+    logger.info(f'Length of test activations: {activations_test.shape}')
 
     ######## Get attributions
 
-    print('Getting the attributions')
+    logger.info('Getting the attributions')
 
     sample, label = dataset_train[0]
     shape = sample.reshape(1, -1).shape
@@ -285,19 +305,20 @@ def main():
     baselines = torch.from_numpy(np.array([dataset_train[torch.randint(len(dataset_train), (1,))][0] for _ in range(10)])).reshape(-1, *shape).float().to(device)
 
     attribution_techniques = [
-        # ['LRP', LRP],
-        # ['Saliency', Saliency, {}],
-        # ['InputXGradient', InputXGradient, {}],
+        ['LRP', LRP],
+        ['Saliency', Saliency, {}],
+        ['InputXGradient', InputXGradient, {}],
         ['DeepLift', DeepLift, {}],
         ['DeepLiftShap', DeepLiftShap, {'baselines': baselines}],
-        # ['IntegratedGradients', IntegratedGradients, {}],
-        # ['GradientShap', GradientShap, {'baselines': baselines}],
+        ['IntegratedGradients', IntegratedGradients, {}],
+        ['GradientShap', GradientShap, {'baselines': baselines}],
         # ['ShapleyValueSampling', ShapleyValueSampling, {}],
         # ['Occlusion', Occlusion, {'sliding_window_shapes': (1, 5)}],
     ]
     attribution_techniques_dict = {k: [v, vv] for k, v, vv in attribution_techniques}
 
     attributions_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-attributions.pkl')
+    logger.info(f'Path for attribution data: {attributions_path} and exists: {os.path.exists(attributions_path)}')
     if os.path.exists(attributions_path):
         with open(attributions_path, 'rb') as file:
             attributions = dill.load(file)
@@ -313,8 +334,8 @@ def main():
             at_name, at_function, at_kwargs = at
             attribute_tec = at_function(model)
 
-            print(f'Calculcate: {at_name}')
-            print(f'Start with train')
+            logger.info(f'Calculcate: {at_name}')
+            logger.info(f'Start with train')
 
             attributions_tmp = []
             for x in dataloader_train_not_shuffled:
@@ -330,7 +351,7 @@ def main():
             attributions['train'][at_name] = attributions_tmp.detach().cpu().reshape(-1, shape[-1]).numpy()
             del attributions_tmp
 
-            print(f'Start with test')
+            logger.info(f'Start with test')
 
             attributions_tmp = []
             for x in dataloader_test:
@@ -352,8 +373,8 @@ def main():
     attributions_train = attributions['train']
     attributions_test = attributions['test']
 
-    print(f'Length of train attributions: {len(attributions_train)} - {attributions_train.keys()}')
-    print(f'Length of test attributions: {len(attributions_test)} - {attributions_test.keys()}')
+    logger.info(f'Length of train attributions: {len(attributions_train)} - {attributions_train.keys()}')
+    logger.info(f'Length of test attributions: {len(attributions_test)} - {attributions_test.keys()}')
 
     ######## Base Data
 
@@ -375,12 +396,13 @@ def main():
     ######## Projections
 
     mappers_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-mappers.pkl')
+    logger.info(f'Path for projection data: {mappers_path} and exists: {os.path.exists(mappers_path)}')
     if os.path.exists(mappers_path):
         with open(mappers_path, 'rb') as file:
             mappings_to_create = dill.load(file)
     else:
 
-        print('Start generating projections')
+        logger.info('Start generating projections')
 
         mappings_to_create = {
             'data': {
@@ -405,7 +427,7 @@ def main():
 
 
         for map_to_create in mappings_to_create:
-            print(map_to_create)
+            logger.info(map_to_create)
             for stage in mappings_to_create[map_to_create]:
                 data = base_data_for_maps[map_to_create][stage]
                 if isinstance(data, dict):
@@ -421,17 +443,18 @@ def main():
         with open(mappers_path, 'wb') as file:
             dill.dump(mappings_to_create, file)
 
-    print('Done with generating projections')
+    logger.info('Done with generating projections')
 
     ######## Density Map
 
     density_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-density.pkl')
+    logger.info(f'Path for density data: {density_path} and exists: {os.path.exists(density_path)}')
     if os.path.exists(density_path):
         with open(density_path, 'rb') as file:
             density_map = dill.load(file)
     else:
 
-        print('Start with generating density maps')
+        logger.info('Start with generating density maps')
 
         density_map = {
             'data': {
@@ -475,10 +498,10 @@ def main():
             return predictions
 
         # Generate grid data and prediction density for data
-        print('Start with density time series map')
+        logger.info('Start with density time series map')
         augmented_time_series = {}
         for stage in base_data_for_maps['data']:
-            print('\t', f'Start with {stage}')
+            logger.info(f'\t Start with {stage}')
             mapper, projected_data = mappings_to_create['data'][stage]
             data = base_data_for_maps['data'][stage]
 
@@ -489,9 +512,9 @@ def main():
             density_map['data'][stage] = [mapped_data, density_predictions]
 
         # Generate activation prediction density
-        print('Start with density activations map')
+        logger.info('Start with density activations map')
         for stage in base_data_for_maps['activations']:
-            print('\t', f'Start with {stage}')
+            logger.info(f'\t Start with {stage}')
             mapper, projected_data = mappings_to_create['activations'][stage]
 
             # Create further activation data
@@ -509,16 +532,16 @@ def main():
             density_predictions = np.array(density_predictions)
 
             density_map['activations'][stage] = [mapped_data, density_predictions]
-        print('Done with activations')
+        logger.info('Done with activations')
 
         # Generate attribution prediction density
-        print('Start with density attributions map')
+        logger.info('Start with density attributions map')
         for stage in base_data_for_maps['attributions']:
-            print('\t', f'Start with {stage}')
+            logger.info(f'\t Start with {stage}')
             density_map['attributions'][stage] = {}
 
             for attribution in base_data_for_maps['attributions'][stage]:
-                print('\t\t', f'Start with {attribution}')
+                logger.info(f'\t\t Start with {attribution}')
                 mapper, projected_data = mappings_to_create['attributions'][stage][attribution]
 
                 # Create further attribution data
@@ -536,13 +559,36 @@ def main():
                 density_predictions = np.array(density_predictions)
 
                 density_map['attributions'][stage][attribution] = [mapped_data, density_predictions]
-        print('Done with attributions')
+        logger.info('Done with attributions')
 
         with open(density_path, 'wb') as file:
             dill.dump(density_map, file)
 
-    print('Done with generating density maps')
-    print(f'Extracting data done for {model_base_name}.')
+    logger.info('Done with generating density maps')
+
+    # Combine data
+    combined_path = os.path.join(extracted_data_path, f'{model_base_name.lower()}-combined.pkl')
+    logger.info(f'Path for combined data: {combined_path} and exists: {os.path.exists(combined_path)}')
+    if os.path.exists(combined_path):
+        with open(combined_path, 'rb') as file:
+            combined_results = dill.load(file)
+    else:
+
+        combined_results = {
+            'data': data_to_save,
+            'activations': activations,
+            'attributions': attributions,
+            'density': density_map,
+            'mappers': mappings_to_create,
+        }
+
+        with open(combined_path, 'wb') as file:
+            dill.dump(combined_results, file)
+
+    logger.info(f'Extracting data done for {model_base_name}.')
+
+    app_end_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    logger.info(f'Application ended at {app_end_time}\n')
 
 
 if __name__ == '__main__':

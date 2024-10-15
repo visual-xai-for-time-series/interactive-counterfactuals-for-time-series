@@ -36,7 +36,7 @@ import { environment } from '../../environments/environment'
     styleUrl: './visualization.component.scss',
 })
 export class VisualizationComponent implements OnInit {
-    private dataset = 'resnet-ecg5000'
+    private dataset = 'resnet-wafer' // resnet-ecg5000 resnet-wafer resnet-forda
 
     private stage = 'train'
 
@@ -69,6 +69,9 @@ export class VisualizationComponent implements OnInit {
     public colorScales = this.baseUrl + '/api/get_color_scale/'
 
     public originalTimeSeries = this.baseUrl + '/api/get_time_series/?stage=' + this.stage
+
+    public setBaseModel = this.baseUrl + '/api/set_model/?model='
+
     public firstDataLoaded = false
 
     constructor(
@@ -77,27 +80,43 @@ export class VisualizationComponent implements OnInit {
         private dataService: DataService
     ) {}
 
+    loadData(baseModel): void {
+        this.httpService.post<any>(this.setBaseModel + baseModel, {}).subscribe((data: any) => {
+            console.log(data)
+
+            console.log('Model Loaded')
+
+            this.httpService.get<any>(this.colorScales).subscribe((data: any) => {
+                const parsed_data = JSON.parse(data)
+                this.dataService.setColorScale(parsed_data['color'])
+
+                console.log('Color Scale Loaded')
+
+                this.httpService.get<any>(this.originalTimeSeries).subscribe((data: any) => {
+                    const parsed_data = JSON.parse(data)
+                    this.interactionsService.setData(parsed_data['data'])
+
+                    this.firstDataLoaded = true
+                    console.log('Data Loaded')
+                })
+            })
+        })
+    }
+
     ngOnInit(): void {
         console.log(this.baseUrl)
         this.firstDataLoaded = false
 
-        this.httpService.get<any>(this.colorScales).subscribe((data: any) => {
-            const parsed_data = JSON.parse(data)
-            this.dataService.setColorScale(parsed_data['color'])
-
-            console.log('Color Scale Loaded')
-
-            this.httpService.get<any>(this.originalTimeSeries).subscribe((data: any) => {
-                const parsed_data = JSON.parse(data)
-                this.interactionsService.setData(parsed_data['data'])
-
-                this.firstDataLoaded = true
-                console.log('Data Loaded')
-            })
-        })
+        this.loadData(this.dataset)
 
         this.httpService.isRequestPending().subscribe((pending: boolean) => {
             this.isRequestPending = pending
+        })
+
+        this.interactionsService.getReloadData.subscribe((data) => {
+            if (data != '') {
+                this.loadData(data)
+            }
         })
     }
 
